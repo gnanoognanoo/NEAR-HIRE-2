@@ -1,0 +1,153 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #272231;
+  background: #fff;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+header {
+  padding: 25px 5%;
+  border-bottom: 1px solid #e8e2ee;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+header strong {
+  font-size: 29px;
+  letter-spacing: -1px;
+}
+header span {
+  color: #6941a5;
+}
+small {
+  color: #756a81;
+  letter-spacing: 2px;
+  font-size: 10px;
+}
+main {
+  max-width: 1300px;
+  margin: auto;
+  padding: 32px 5%;
+}
+h1 {
+  font-size: 32px;
+  letter-spacing: -1px;
+  font-weight: 600;
+}
+h2 {
+  font-size: 30px;
+}
+p {
+  color: #6f687a;
+  line-height: 1.6;
+}
+nav,
+.top,
+.search {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+nav {
+  justify-content: flex-start;
+  border-bottom: 1px solid #e8e2ee;
+  padding: 12px 0;
+  margin-bottom: 28px;
+}
+a {
+  color: #6941a5;
+  text-decoration: none;
+  padding: 9px;
+}
+a[aria-current] {
+  background: #f5f1fa;
+  border-radius: 8px;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+article,
+section {
+  border: 1px solid #e8e2ee;
+  border-radius: 12px;
+  padding: 24px;
+}
+article p {
+  text-transform: capitalize;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+input,
+select {
+  border: 1px solid #dcd4e5;
+  border-radius: 7px;
+  padding: 12px;
+  font: inherit;
+  min-height: 44px;
+}
+button {
+  background: #6941a5;
+  color: #fff;
+  border: 0;
+  padding: 13px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-height: 44px;
+  font: inherit;
+}
+.secondary {
+  background: #f5f1fa;
+  color: #6941a5;
+}
+.login {
+  max-width: 450px;
+  margin: 50px auto;
+}
+.table {
+  overflow: auto;
+  margin: 25px 0;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th,
+td {
+  padding: 16px;
+  text-align: left;
+  border-bottom: 1px solid #e8e2ee;
+  vertical-align: top;
+  min-width: 100px;
+}
+th {
+  background: #faf8fd;
+  text-transform: capitalize;
+}
+td form {
+  min-width: 210px;
+}
+[role="alert"] {
+  background: #fff2f5;
+  padding: 18px;
+  border-radius: 8px;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #ad8bcf;
+  outline-offset: 3px;
+}

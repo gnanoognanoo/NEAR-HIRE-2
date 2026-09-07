@@ -1,0 +1,7 @@
+node_modules
+package-lock.json
+dist
+.next
+.expo
+apps/mobile/PreviewApp.tsx
+docs/product-requirements.md

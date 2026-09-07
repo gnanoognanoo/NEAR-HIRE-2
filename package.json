@@ -1,0 +1,24 @@
+{
+  "name": "nearhire",
+  "private": true,
+  "scripts": {
+    "check": "npm --prefix apps/mobile run check && npm --prefix apps/admin run check",
+    "test": "npm --prefix apps/mobile test && node --test tests/localization.mjs",
+    "build": "npm --prefix apps/mobile run build:web && npm --prefix apps/admin run build",
+    "format": "prettier --write .",
+    "lint": "eslint apps/mobile/src/live apps/mobile/App.tsx apps/admin/app packages --max-warnings 0",
+    "test:db": "node tests/database.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-postgis": "^0.2.8",
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "prettier": "^3.6.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.46.0"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  }
+}
