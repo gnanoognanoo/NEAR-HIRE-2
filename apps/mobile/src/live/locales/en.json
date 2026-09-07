@@ -177,5 +177,15 @@
   "mapView": "Map view",
   "listView": "List view",
   "buyCredits": "Buy credits",
-  "paymentVerifying": "Payment submitted. Credits appear after server verification. Refresh your balance shortly."
+  "paymentVerifying": "Payment submitted. Credits appear after server verification. Refresh your balance shortly.",
+  "phoneHint": "Enter your Indian mobile number, or include + and the country code for another country.",
+  "changePhone": "Change phone number",
+  "otpIncorrect": "The code is incorrect. Check the SMS and try again.",
+  "otpExpired": "This code is invalid or expired. Try the latest SMS code or request a new one.",
+  "authRateLimit": "Too many attempts. Wait before trying again. The service may require a longer wait.",
+  "authNetwork": "No connection to the sign-in service. Reconnect and try again.",
+  "authProviderUnavailable": "SMS sign-in is temporarily unavailable. Please try again later.",
+  "otpSent": "Verification code sent. Enter the latest code from your SMS.",
+  "otpSuccess": "Phone verified successfully.",
+  "sessionRestoreError": "Your saved session could not be loaded. Reconnect and try again; your saved login has not been cleared."
 }

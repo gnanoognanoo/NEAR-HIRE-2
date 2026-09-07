@@ -1,12 +1,12 @@
 import "react-native-url-polyfill/auto";
 import { AppState, Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, processLock } from "@supabase/supabase-js";
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 export const configured = Boolean(url && key);
 // Native tokens belong in the OS keychain. Web preview sessions are tab-scoped.
-const storage = {
+export const storage = {
   async getItem(k: string) {
     if (Platform.OS === "web")
       return typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(k);
@@ -31,7 +31,13 @@ const storage = {
 };
 export const db = configured
   ? createClient(url!, key!, {
-      auth: { storage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      auth: {
+        lock: processLock,
+        storage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
       global: {
         fetch: async (input, init) =>
           fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(20000) }),
@@ -39,6 +45,8 @@ export const db = configured
     })
   : null;
 if (Platform.OS !== "web" && db) {
+  if (AppState.currentState === "active") db.auth.startAutoRefresh();
+  else db.auth.stopAutoRefresh();
   AppState.addEventListener("change", (s) => {
     if (s === "active") db.auth.startAutoRefresh();
     else db.auth.stopAutoRefresh();

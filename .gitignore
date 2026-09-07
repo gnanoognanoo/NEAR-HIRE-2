@@ -41,3 +41,4 @@ out/
 *.mobileprovision
 .DS_Store
 .claude/
+/apps/mobile/dist-auth-android/

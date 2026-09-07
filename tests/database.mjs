@@ -19,6 +19,7 @@ for (const file of [
   "202609060002_operations.sql",
   "202609060003_hardening.sql",
   "202609060004_categories.sql",
+  "202609070001_auth_device_cleanup.sql",
 ]) {
   let sql = await readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8");
   sql = sql.replace(
@@ -252,6 +253,29 @@ await check("non-admin cannot read metrics or moderate", async () => {
   await assert.rejects(() => asUser(stranger, () => rpc("admin_overview")));
   await pg.exec("select set_config('request.jwt.claim.aal','aal2',false)");
   assert.ok(await asUser(stranger, () => rpc("admin_overview")));
+});
+await check("logout device cleanup is owner-scoped and idempotent", async () => {
+  const token = "fictional-device-token-for-logout";
+  await asUser(worker, () => rpc("register_device", [token, "android"]));
+  await asUser(stranger, () => rpc("unregister_device", [token]));
+  assert.equal(
+    (await pg.query("select count(*)::int n from public.user_devices where token=$1", [token]))
+      .rows[0].n,
+    1,
+  );
+  await asUser(worker, () => rpc("unregister_device", [token]));
+  await asUser(worker, () => rpc("unregister_device", [token]));
+  assert.equal(
+    (await pg.query("select count(*)::int n from public.user_devices where token=$1", [token]))
+      .rows[0].n,
+    0,
+  );
+  await pg.exec("set role anon");
+  try {
+    await assert.rejects(() => rpc("unregister_device", [token]));
+  } finally {
+    await pg.exec("reset role");
+  }
 });
 console.log(
   `${checks} database integration scenarios passed. Real PostGIS; mocked Auth identity and cron registration only.`,

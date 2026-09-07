@@ -1,24 +1,64 @@
-import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { normalizePhone, createAuthGate } from "./auth-logic";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { backend, edge, rpc } from "./client";
+import { backend, edge, rpc, storage } from "./client";
+const authGate = createAuthGate();
+let loggingOut = false;
+let deviceQueue: Promise<unknown> = Promise.resolve();
+const DEVICE_KEY = "nearhire.push-token";
+function registerToken(token: string) {
+  if (loggingOut) return Promise.resolve();
+  deviceQueue = deviceQueue
+    .catch(() => {})
+    .then(async () => {
+      await rpc("register_device", { p_token: token, p_platform: "android" });
+      await storage.setItem(DEVICE_KEY, token);
+    });
+  return deviceQueue;
+}
 export const authService = {
+  remaining: () => authGate.remaining(),
   async send(phone: string) {
-    const number = parsePhoneNumberFromString(phone, "IN");
-    if (!number?.isValid()) throw new Error("INVALID_PHONE");
-    const { error } = await backend().auth.signInWithOtp({ phone: number.number });
-    if (error) throw error;
-    return number.number;
+    const number = normalizePhone(phone);
+    return authGate.run("send", async () => {
+      const { error } = await backend().auth.signInWithOtp({
+        phone: number,
+        options: { shouldCreateUser: true },
+      });
+      if (error) throw error;
+      return number;
+    });
   },
   async verify(phone: string, token: string) {
     if (!/^\d{6}$/.test(token)) throw new Error("INVALID_OTP");
-    const { error } = await backend().auth.verifyOtp({ phone, token, type: "sms" });
-    if (error) throw error;
+    return authGate.run("verify", async () => {
+      const { data, error } = await backend().auth.verifyOtp({
+        phone: normalizePhone(phone),
+        token,
+        type: "sms",
+      });
+      if (error) throw error;
+      if (!data.session) throw new Error("AUTH_REQUIRED");
+    });
   },
   async logout() {
-    const { error } = await backend().auth.signOut();
-    if (error) throw error;
+    loggingOut = true;
+    try {
+      await deviceQueue.catch(() => {});
+      let token = await storage.getItem(DEVICE_KEY);
+      if (!token && Platform.OS === "android") {
+        const permission = await Notifications.getPermissionsAsync();
+        if (permission.status === "granted")
+          token = (await Notifications.getDevicePushTokenAsync()).data;
+      }
+      if (token) await rpc("unregister_device", { p_token: token });
+      const { error } = await backend().auth.signOut({ scope: "local" });
+      if (error) throw error;
+      await storage.removeItem(DEVICE_KEY);
+    } finally {
+      loggingOut = false;
+    }
   },
   async remove() {
     await edge("delete-account", { confirmation: "DELETE" });
@@ -110,12 +150,11 @@ export const notificationService = {
     const permission = await Notifications.requestPermissionsAsync();
     if (permission.status !== "granted") throw new Error("NOTIFICATION_PERMISSION_DENIED");
     const token = await Notifications.getDevicePushTokenAsync();
-    await rpc("register_device", { p_token: token.data, p_platform: "android" });
+    await registerToken(token.data);
   },
   subscribeRefresh() {
     return Notifications.addPushTokenListener((token) => {
-      if (Platform.OS === "android")
-        rpc("register_device", { p_token: token.data, p_platform: "android" }).catch(() => {});
+      if (Platform.OS === "android") registerToken(token.data).catch(() => {});
     });
   },
 };

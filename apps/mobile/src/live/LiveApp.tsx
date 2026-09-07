@@ -1,3 +1,5 @@
+import PhoneAuth from "./PhoneAuth";
+import { profileComplete, restoredSession, authErrorKey, withAuthTimeout } from "./auth-logic";
 import React, { useEffect, useState, useRef, createContext, useContext } from "react";
 import { ActivityIndicator, Linking, Modal, ScrollView, Text, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -68,6 +70,8 @@ export default function LiveApp() {
   const busyRef = useRef(false);
   const qc = useQueryClient();
   const [language, setLanguage] = useState<Lang | null>(null);
+  const [bootError, setBootError] = useState(false);
+  const [bootAttempt, setBootAttempt] = useState(0);
   const [boot, setBoot] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [screen, setScreen] = useState("home");
@@ -80,32 +84,45 @@ export default function LiveApp() {
     (language === "ta" ? ta : en)[k as keyof typeof en] || en[k as keyof typeof en] || k;
   useEffect(() => {
     let alive = true;
-    Promise.all([AsyncStorage.getItem("nearhire.language"), db?.auth.getSession()])
+    let authRevision = 0;
+    setBoot(true);
+    setBootError(false);
+    Promise.all([
+      AsyncStorage.getItem("nearhire.language"),
+      db ? withAuthTimeout(db.auth.getSession()) : undefined,
+    ])
       .then(([l, a]) => {
         if (alive) {
           setLanguage(l === "en" || l === "ta" ? l : null);
-          setSession(a?.data.session || null);
+          const restored = a ? restoredSession(a) : null;
+          if (authRevision === 0) setSession(restored);
         }
       })
       .catch(() => {
-        if (alive) setError("genericError");
+        if (alive) setBootError(true);
       })
       .finally(() => {
         if (alive) setBoot(false);
       });
     const sub = db?.auth.onAuthStateChange((_event, newSession) => {
+      if (!alive) return;
+      if (_event !== "INITIAL_SESSION") authRevision++;
       setSession(newSession);
+      if (newSession) setBootError(false);
       if (!newSession) {
         qc.clear();
         setScreen("home");
         setPosition(null);
+        setLocationOpen(false);
+        setError("");
+        setMessage("");
       }
     });
     return () => {
       alive = false;
       sub?.data.subscription.unsubscribe();
     };
-  }, [qc]);
+  }, [qc, bootAttempt]);
   useEffect(() => {
     if (!session) return;
     const sub = notificationService.subscribeRefresh();
@@ -147,7 +164,7 @@ export default function LiveApp() {
           ? codeMap[code]
           : text.toLowerCase().includes("otp") || text.toLowerCase().includes("token has expired")
             ? "otpError"
-            : "genericError",
+            : authErrorKey(e),
       );
     } finally {
       busyRef.current = false;
@@ -160,7 +177,12 @@ export default function LiveApp() {
         <ActivityIndicator color={colors.accent} />
       </SafeAreaView>
     );
-  const content = !language ? (
+  const content = bootError ? (
+    <>
+      <Text style={s.body}>{t("sessionRestoreError")}</Text>
+      <Button title={t("retry")} onPress={() => setBootAttempt((v) => v + 1)} />
+    </>
+  ) : !language ? (
     <>
       <Text style={s.title}>{t("chooseLanguage")}</Text>
       <Button title="English" onPress={() => choose("en")} />
@@ -172,7 +194,7 @@ export default function LiveApp() {
       <Text style={s.body}>{t("setupBody")}</Text>
     </>
   ) : !session ? (
-    <Auth t={t} busy={busy} run={run} />
+    <PhoneAuth t={t} onVerified={() => setMessage("otpSuccess")} />
   ) : profile.isPending ? (
     <ActivityIndicator color={colors.accent} />
   ) : profile.isError ? (
@@ -181,7 +203,7 @@ export default function LiveApp() {
       <Button title={t("retry")} onPress={() => profile.refetch()} />
       <Button title={t("logout")} secondary onPress={() => run(authService.logout, "")} />
     </>
-  ) : !profile.data?.name ? (
+  ) : !profileComplete(profile.data) ? (
     <ProfileForm
       initial={profile.data}
       language={language}
@@ -317,7 +339,7 @@ export default function LiveApp() {
           )}
           {busy && <ActivityIndicator color={colors.accent} />} {content}
         </ScrollView>
-        {!!session && !!profile.data?.name && (
+        {!!session && profileComplete(profile.data) && (
           <View style={s.nav}>
             {["home", "jobs", "activity", "notifications", "profile"].map((k) => (
               <View key={k} style={s.navItem}>
@@ -363,46 +385,6 @@ export default function LiveApp() {
         </Modal>
       </SafeAreaView>
     </FeedbackContext.Provider>
-  );
-}
-function Auth({ t, busy, run }: { t: Translate; busy: boolean; run: Run }) {
-  const [phone, setPhone] = useState("+91");
-  const [sent, setSent] = useState("");
-  const [otp, setOtp] = useState("");
-  const [until, setUntil] = useState(0);
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <>
-      <Text style={s.title}>{t("login")}</Text>
-      <Field label={t("phone")} value={phone} onChange={setPhone} />
-      {sent && <Field label={t("otp")} value={otp} onChange={setOtp} numeric />}
-      {sent && (
-        <Button
-          title={t("verify")}
-          disabled={busy || otp.length !== 6}
-          onPress={() => run(() => authService.verify(sent, otp), "")}
-        />
-      )}
-      <Button
-        title={
-          now < until
-            ? `${t("resend")} · ${Math.ceil((until - now) / 1000)}s`
-            : t(sent ? "resend" : "sendOtp")
-        }
-        disabled={busy || now < until}
-        onPress={() =>
-          run(async () => {
-            const normalized = await authService.send(phone);
-            setSent(normalized);
-            setUntil(Date.now() + 60000);
-          }, "")
-        }
-      />
-    </>
   );
 }
 function ProfileForm({
