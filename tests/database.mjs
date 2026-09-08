@@ -20,6 +20,7 @@ for (const file of [
   "202609060003_hardening.sql",
   "202609060004_categories.sql",
   "202609070001_auth_device_cleanup.sql",
+  "202609070002_location_notifications.sql",
 ]) {
   let sql = await readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8");
   sql = sql.replace(
@@ -277,6 +278,315 @@ await check("logout device cleanup is owner-scoped and idempotent", async () => 
     await pg.exec("reset role");
   }
 });
+
+const geoOwner = "40000000-0000-0000-0000-000000000001",
+  geoWorker = "40000000-0000-0000-0000-000000000002";
+await pg.query("insert into auth.users values($1,$3),($2,$4)", [
+  geoOwner,
+  geoWorker,
+  "+919000000004",
+  "+919000000005",
+]);
+await asUser(geoOwner, () =>
+  rpc("save_profile", [{ name: "Geo owner", locality: "Fixture", languages: ["ta"] }]),
+);
+await asUser(geoWorker, () =>
+  rpc("save_profile", [{ name: "Geo worker", locality: "Fixture", languages: ["ta"] }]),
+);
+const geoQuery = (radius = 3000, filter = {}, offset = 0) =>
+  asUser(geoWorker, () =>
+    pg.query("select * from public.nearby_jobs(18,78,$1,$2,$3)", [radius, filter, offset]),
+  );
+async function geoJob(distance, status = "active", pay = 500) {
+  const row = await pg.query(
+    "insert into public.jobs(poster_id,title,kind,category,description,pay,pay_unit,schedule,locality,request_id) values($1,'Geo fixture','residential','electrician','Fictional test work only',$2,'day','Afternoon','Public locality',gen_random_uuid()) returning id",
+    [geoOwner, pay],
+  );
+  const id = row.rows[0].id;
+  await pg.query(
+    "insert into public.job_locations values($1,extensions.st_project(extensions.st_setsrid(extensions.st_makepoint(78,18),4326)::extensions.geography,$2::double precision,0::double precision),'PRIVATE GEO FIXTURE')",
+    [id, distance],
+  );
+  await pg.query(
+    "update public.jobs set status=$2,published_at=now(),expires_at=now()+interval '24 hours' where id=$1",
+    [id, status],
+  );
+  return id;
+}
+const near = await geoJob(500),
+  middle = await geoJob(2000),
+  far = await geoJob(6000);
+await check("500m / 2km / 6km geographic radius boundaries", async () => {
+  assert.deepEqual(
+    (await geoQuery(1000)).rows.map((r) => r.job.id),
+    [near],
+  );
+  assert.deepEqual(
+    new Set((await geoQuery(3000)).rows.map((r) => r.job.id)),
+    new Set([near, middle]),
+  );
+  assert.ok(!(await geoQuery(5000)).rows.some((r) => r.job.id === far));
+});
+await check("expired, cancelled, reported and suspended nearby jobs never appear", async () => {
+  const expired = await geoJob(400);
+  await pg.query(
+    "update public.jobs set published_at=now()-interval '25 hours',expires_at=now()-interval '1 hour' where id=$1",
+    [expired],
+  );
+  const hidden = [expired];
+  for (const status of ["cancelled", "reported", "suspended"])
+    hidden.push(await geoJob(450, status));
+  const ids = (await geoQuery()).rows.map((r) => r.job.id);
+  for (const id of hidden) assert.ok(!ids.includes(id));
+});
+await check("nearest and pay sorting plus combined filters are deterministic", async () => {
+  assert.deepEqual(
+    (await geoQuery(3000, { sort: "nearest" })).rows.map((r) => r.job.id),
+    [near, middle],
+  );
+  await pg.query("update public.jobs set pay=750 where id=$1", [middle]);
+  assert.equal((await geoQuery(3000, { sort: "pay" })).rows[0].job.id, middle);
+  assert.deepEqual(
+    (
+      await geoQuery(3000, {
+        kind: "residential",
+        category: "electrician",
+        employment_type: "temporary",
+        language: "ta",
+        min_pay: 600,
+        max_pay: 800,
+        pay_unit: "day",
+      })
+    ).rows.map((r) => r.job.id),
+    [middle],
+  );
+  assert.equal((await geoQuery(3000, { kind: "business" })).rows.length, 0);
+});
+await check("nearby payload is public-safe; exact coordinates require acceptance", async () => {
+  const row = (await geoQuery(1000)).rows[0];
+  assert.deepEqual(Object.keys(row).sort(), [
+    "approx_lat",
+    "approx_lng",
+    "distance_m",
+    "job",
+    "match_score",
+  ]);
+  for (const field of [
+    "latitude",
+    "longitude",
+    "location",
+    "exact_address",
+    "instructions",
+    "request_id",
+  ])
+    assert.ok(!(field in row.job));
+  const exact = (
+    await pg.query(
+      "select extensions.st_y(location::extensions.geometry) lat from public.job_locations where job_id=$1",
+      [near],
+    )
+  ).rows[0].lat;
+  assert.notEqual(row.approx_lat, exact);
+  assert.equal(
+    (
+      await asUser(geoWorker, () =>
+        pg.query("select * from public.job_locations where job_id=$1", [near]),
+      )
+    ).rows.length,
+    0,
+  );
+  const app = await asUser(geoWorker, () => rpc("apply_job", [near]));
+  await assert.rejects(() => asUser(geoWorker, () => rpc("private_contact", [app])));
+  await asUser(geoOwner, () => rpc("decide_application", [app, "accepted"]));
+  const contact = await asUser(geoWorker, () => rpc("private_contact", [app]));
+  assert.equal(contact.exact_address, "PRIVATE GEO FIXTURE");
+  assert.equal(contact.latitude, exact);
+  await assert.rejects(() => asUser(stranger, () => rpc("private_contact", [app])));
+});
+await check("pagination returns 20 then remaining rows with no duplicate job IDs", async () => {
+  for (let i = 0; i < 23; i++) await geoJob(700 + i * 10);
+  const first = (await geoQuery(3000, { sort: "nearest" }, 0)).rows,
+    second = (await geoQuery(3000, { sort: "nearest" }, 20)).rows;
+  assert.equal(first.length, 20);
+  assert.equal(
+    new Set([...first, ...second].map((r) => r.job.id)).size,
+    first.length + second.length,
+  );
+  assert.ok(second.length > 0);
+});
+await check("invalid discovery and job coordinates are rejected", async () => {
+  for (const pair of [
+    [91, 0],
+    [0, 181],
+    [null, 0],
+    [NaN, 0],
+  ])
+    await assert.rejects(() =>
+      asUser(geoWorker, () => pg.query("select * from public.nearby_jobs($1,$2,3000)", pair)),
+    );
+  await assert.rejects(() =>
+    asUser(geoOwner, () =>
+      rpc("create_job", [{ ...input, latitude: 91 }, "50000000-0000-0000-0000-000000000001"]),
+    ),
+  );
+});
+await check(
+  "nearby notifications target opt-in workers and publication retries dedupe",
+  async () => {
+    await asUser(geoWorker, () => rpc("set_worker_location", [18, 78, true]));
+    const id = await geoJob(800);
+    const count = async () =>
+      Number(
+        (
+          await pg.query(
+            "select count(*) n from public.notifications where user_id=$1 and job_id=$2 and event='nearby_job'",
+            [geoWorker, id],
+          )
+        ).rows[0].n,
+      );
+    assert.equal(await count(), 1);
+    await asUser(geoOwner, () => rpc("publish_job", [id]));
+    assert.equal(await count(), 1);
+    await asUser(geoWorker, () => rpc("set_worker_location", [18, 78, false]));
+    const other = await geoJob(900);
+    assert.equal(
+      Number(
+        (
+          await pg.query(
+            "select count(*) n from public.notifications where user_id=$1 and job_id=$2 and event='nearby_job'",
+            [geoWorker, other],
+          )
+        ).rows[0].n,
+      ),
+      0,
+    );
+    await assert.rejects(() =>
+      asUser(geoWorker, () => pg.query("select * from private.worker_locations")),
+    );
+  },
+);
+await check(
+  "notification delivery acknowledgements prevent repeated successful token sends",
+  async () => {
+    const token = "fictional-notification-token";
+    await asUser(geoWorker, () => rpc("register_device", [token, "android"]));
+    const event = (
+      await pg.query(
+        "select id from public.notifications where user_id=$1 and event='application_accepted' limit 1",
+        [geoWorker],
+      )
+    ).rows[0].id;
+    await pg.exec("set role service_role");
+    try {
+      await rpc("record_notification_delivery", [event, token]);
+      await rpc("record_notification_delivery", [event, token]);
+    } finally {
+      await pg.exec("reset role");
+    }
+    assert.equal(
+      Number(
+        (
+          await pg.query(
+            "select count(*) n from private.notification_deliveries where notification_id=$1",
+            [event],
+          )
+        ).rows[0].n,
+      ),
+      1,
+    );
+    const claimed = await rpc("claim_notifications");
+    const item = claimed.find((e) => e.id === event);
+    assert.ok(item);
+    assert.ok(!item.tokens.includes(token));
+    await assert.rejects(() =>
+      asUser(geoWorker, () => rpc("record_notification_delivery", [event, token])),
+    );
+  },
+);
+
+await check("matching weights total 100 and geospatial indexes exist", async () => {
+  assert.equal(
+    (await pg.query("select private.match_score(0,3000,true,true,true,true,5) score")).rows[0]
+      .score,
+    100,
+  );
+  assert.equal(
+    (await pg.query("select private.match_score(3000,3000,false,false,false,false,0) score"))
+      .rows[0].score,
+    0,
+  );
+  const indexes = (
+    await pg.query(
+      "select indexname from pg_indexes where indexname in ('job_locations_gist','worker_locations_gist','notification_outbox_pending')",
+    )
+  ).rows;
+  assert.equal(indexes.length, 3);
+});
+await check(
+  "nearby notification targeting respects distance, preferences and later opt-out",
+  async () => {
+    await asUser(geoWorker, () => rpc("set_worker_location", [18, 78, true]));
+    const far = await geoJob(6000);
+    assert.equal(
+      Number(
+        (
+          await pg.query(
+            "select count(*) n from public.notifications where user_id=$1 and job_id=$2",
+            [geoWorker, far],
+          )
+        ).rows[0].n,
+      ),
+      0,
+    );
+    await pg.query("update public.profiles set notifications_enabled=false where id=$1", [
+      geoWorker,
+    ]);
+    const muted = await geoJob(500);
+    assert.equal(
+      Number(
+        (
+          await pg.query(
+            "select count(*) n from public.notifications where user_id=$1 and job_id=$2",
+            [geoWorker, muted],
+          )
+        ).rows[0].n,
+      ),
+      0,
+    );
+    await pg.query("update public.profiles set notifications_enabled=true where id=$1", [
+      geoWorker,
+    ]);
+    await pg.query(
+      "update public.worker_profiles set categories=array['not-this-category'] where user_id=$1",
+      [geoWorker],
+    );
+    const mismatch = await geoJob(500);
+    assert.equal(
+      Number(
+        (
+          await pg.query(
+            "select count(*) n from public.notifications where user_id=$1 and job_id=$2",
+            [geoWorker, mismatch],
+          )
+        ).rows[0].n,
+      ),
+      0,
+    );
+    await pg.query("update public.worker_profiles set categories='{}' where user_id=$1", [
+      geoWorker,
+    ]);
+    const pending = await geoJob(500);
+    await asUser(geoWorker, () => rpc("set_worker_location", [18, 78, false]));
+    await rpc("claim_notifications");
+    const row = (
+      await pg.query(
+        "select o.last_error from private.notification_outbox o join public.notifications n on n.id=o.id where n.user_id=$1 and n.job_id=$2 and n.event='nearby_job'",
+        [geoWorker, pending],
+      )
+    ).rows[0];
+    assert.equal(row.last_error, "SUPPRESSED");
+  },
+);
 console.log(
   `${checks} database integration scenarios passed. Real PostGIS; mocked Auth identity and cron registration only.`,
 );

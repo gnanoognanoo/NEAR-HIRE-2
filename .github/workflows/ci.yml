@@ -24,4 +24,4 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno test --config supabase/functions/deno.json supabase/functions/_shared/runtime_test.ts
+      - run: deno test --config supabase/functions/deno.json supabase/functions/_shared/runtime_test.ts supabase/functions/location/provider_test.ts

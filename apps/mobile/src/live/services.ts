@@ -1,3 +1,4 @@
+import { coordinates, boundedLocation } from "./location-logic";
 import { normalizePhone, createAuthGate } from "./auth-logic";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
@@ -119,16 +120,37 @@ export const reportService = {
       p_detail: detail,
     }),
 };
-export type Place = { id: string; label: string; latitude?: number; longitude?: number };
+export type Place = {
+  id: string;
+  label: string;
+  latitude?: number;
+  longitude?: number;
+  locality?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  country?: string;
+  formatted_address?: string;
+};
 export const locationService = {
   async gps() {
     const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== "granted") throw new Error("LOCATION_PERMISSION_DENIED");
-    const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    return { latitude: p.coords.latitude, longitude: p.coords.longitude };
+    if (permission.status !== "granted")
+      throw new Error(
+        permission.canAskAgain ? "LOCATION_PERMISSION_DENIED" : "LOCATION_PERMISSION_PERMANENT",
+      );
+    if (!(await Location.hasServicesEnabledAsync())) throw new Error("GPS_DISABLED");
+    const p = await boundedLocation(
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+    );
+    return coordinates(p.coords.latitude, p.coords.longitude);
   },
   search: (query: string) => edge<Place[]>("location", { action: "search", query }),
   resolve: (id: string) => edge<Place>("location", { action: "resolve", id }),
+  reverse: (latitude: number, longitude: number) =>
+    edge<Place>("location", { action: "reverse", ...coordinates(latitude, longitude) }),
+  alerts: (latitude: number, longitude: number, enabled: boolean) =>
+    rpc("set_worker_location", { p_lat: latitude, p_lng: longitude, p_enabled: enabled }),
 };
 export const notificationService = {
   async list(offset = 0) {

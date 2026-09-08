@@ -44,7 +44,10 @@ The database integration suite runs PostgreSQL/PostGIS business SQL through PGli
 
 ## Release status
 
-This is a full-stack implementation in development, not a deployment-ready production release. The NearHire Supabase project is live in Mumbai with all four migrations and five Edge Functions deployed; hosted RLS coverage and unauthenticated endpoint checks passed. End-to-end hosted testing remains pending. Real SMS delivery, maps credentials, Firebase, Razorpay, Android signing, and hosting require external setup. Payments must remain disabled until the security and accounting release checks pass.
+This is a full-stack implementation in development, not a deployment-ready production release. The NearHire Supabase project is live in Mumbai with all six migrations and five Edge Functions deployed; hosted RLS coverage and unauthenticated endpoint checks passed. End-to-end hosted testing remains pending. Real SMS delivery, maps credentials, Firebase, Razorpay, Android signing, and hosting require external setup. Payments must remain disabled until the security and accounting release checks pass.
 
 See `docs/production-readiness.md` for the current gaps and `docs/deployment.md` for setup. Never commit secrets or put server credentials in public environment variables.
+
+
+Task 3 location, map, privacy and notification setup/testing is documented in docs/location-and-notifications.md.
 

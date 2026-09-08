@@ -1,3 +1,5 @@
+import LocationPicker from "./LocationPicker";
+import { activeNearby, type Position } from "./location-logic";
 import PhoneAuth from "./PhoneAuth";
 import { profileComplete, restoredSession, authErrorKey, withAuthTimeout } from "./auth-logic";
 import React, { useEffect, useState, useRef, createContext, useContext } from "react";
@@ -16,7 +18,6 @@ import {
   jobService,
   locationService,
   notificationService,
-  Place,
   profileService,
   reportService,
   reviewService,
@@ -28,7 +29,7 @@ import ta from "./locales/ta.json";
 import { jobSchema } from "../../../../packages/core/validation";
 type Lang = "en" | "ta";
 type Translate = (key: string) => string;
-type Position = { latitude: number; longitude: number; label?: string };
+
 type Run = (fn: () => Promise<unknown>, success?: string) => Promise<void>;
 const csv = (v: string) =>
   v
@@ -67,6 +68,7 @@ function Feedback() {
   );
 }
 export default function LiveApp() {
+  const loadNextJobs = useRef<() => void>(() => {});
   const busyRef = useRef(false);
   const qc = useQueryClient();
   const [language, setLanguage] = useState<Lang | null>(null);
@@ -229,6 +231,7 @@ export default function LiveApp() {
       )}
       {screen === "jobs" && (
         <Jobs
+          loadMoreRef={loadNextJobs}
           t={t}
           position={position}
           chooseLocation={() => setLocationOpen(true)}
@@ -326,7 +329,18 @@ export default function LiveApp() {
             <Text style={{ color: colors.accent }}>.</Text>
           </Text>
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={200}
+          onScroll={({ nativeEvent: e }) => {
+            if (
+              screen === "jobs" &&
+              e.layoutMeasurement.height + e.contentOffset.y >= e.contentSize.height - 350
+            )
+              loadNextJobs.current();
+          }}
+          contentContainerStyle={s.content}
+        >
           {!!error && (
             <View accessibilityRole="alert" style={s.error}>
               <Text style={s.body}>{t(error)}</Text>
@@ -374,7 +388,7 @@ export default function LiveApp() {
               <Button title={t("close")} secondary onPress={() => setLocationOpen(false)} />
               <LocationPicker
                 t={t}
-                run={run}
+                initial={position}
                 onSelect={(p) => {
                   setPosition(p);
                   setLocationOpen(false);
@@ -438,55 +452,8 @@ function ProfileForm({
     </View>
   );
 }
-function LocationPicker({
-  t,
-  run,
-  onSelect,
-}: {
-  t: Translate;
-  run: Run;
-  onSelect: (p: Position) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [places, setPlaces] = useState<Place[]>([]);
-  return (
-    <>
-      <Text style={s.title}>{t("permissionTitle")}</Text>
-      <Text style={s.body}>{t("locationExplain")}</Text>
-      <Button
-        title={t("gps")}
-        onPress={() => run(async () => onSelect(await locationService.gps()), "locationSelected")}
-      />
-      <Field label={t("manual")} value={query} onChange={setQuery} />
-      <Button
-        title={t("search")}
-        secondary
-        disabled={query.length < 3}
-        onPress={() => run(async () => setPlaces(await locationService.search(query)), "")}
-      />
-      {places.map((p) => (
-        <Button
-          key={p.id}
-          title={p.label}
-          secondary
-          onPress={() =>
-            run(async () => {
-              const point = await locationService.resolve(p.id);
-              if (point.latitude === undefined || point.longitude === undefined)
-                throw new Error("INVALID_LOCATION");
-              onSelect({
-                latitude: point.latitude,
-                longitude: point.longitude,
-                label: point.label,
-              });
-            }, "locationSelected")
-          }
-        />
-      ))}
-    </>
-  );
-}
 function Jobs({
+  loadMoreRef,
   t,
   position,
   chooseLocation,
@@ -495,6 +462,7 @@ function Jobs({
   categories,
   language,
 }: {
+  loadMoreRef: React.RefObject<() => void>;
   t: Translate;
   position: Position | null;
   chooseLocation: () => void;
@@ -511,25 +479,71 @@ function Jobs({
   const [category, setCategory] = useState("");
   const [sort, setSort] = useState("recommended");
   const [minPay, setMinPay] = useState("");
+  const [maxPay, setMaxPay] = useState("");
+  const [employment, setEmployment] = useState("");
+  const [filterLanguage, setFilterLanguage] = useState("");
+  const [payUnit, setPayUnit] = useState("");
+  const [advanced, setAdvanced] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const [selected, setSelected] = useState<any>(null);
   useEffect(() => {
     const id = setTimeout(() => setDebounced(query), 350);
     return () => clearTimeout(id);
   }, [query]);
   const results = useInfiniteQuery({
-    queryKey: ["jobs", position, radius, kind, category, sort, debounced, minPay],
+    queryKey: [
+      "jobs",
+      position,
+      radius,
+      kind,
+      category,
+      sort,
+      debounced,
+      minPay,
+      maxPay,
+      employment,
+      filterLanguage,
+      payUnit,
+    ],
     queryFn: ({ pageParam }) =>
       jobService.nearby(
         position!.latitude,
         position!.longitude,
         radius,
-        { kind, category, sort, query: debounced, min_pay: Number(minPay) || 0 },
+        {
+          kind,
+          category,
+          sort,
+          query: debounced,
+          min_pay: Number(minPay) || 0,
+          max_pay: maxPay ? Number(maxPay) : 1000000,
+          employment_type: employment,
+          language: filterLanguage,
+          pay_unit: payUnit,
+        },
         pageParam,
       ),
     initialPageParam: 0,
     getNextPageParam: (last, all) => (last.length === 20 ? all.length * 20 : undefined),
     enabled: !!position,
+    refetchInterval: 30000,
   });
+  useEffect(() => {
+    loadMoreRef.current = () => {
+      if (results.hasNextPage && !results.isFetching) void results.fetchNextPage();
+    };
+    return () => {
+      loadMoreRef.current = () => {};
+    };
+  }, [loadMoreRef, results]);
+  const visibleJobs = activeNearby(results.data?.pages.flat() || [], now);
+  useEffect(() => {
+    if (selected && Date.parse(selected.expires_at) <= now) setSelected(null);
+  }, [selected, now]);
   return (
     <>
       <Text style={s.title}>{t("nearby")}</Text>
@@ -592,7 +606,71 @@ function Jobs({
               />
             ))}
           </View>
-          <Field label={t("minPay")} value={minPay} onChange={setMinPay} numeric />
+          <Button title={t("filters")} secondary onPress={() => setAdvanced(!advanced)} />
+          {advanced && (
+            <>
+              <Field label={t("minPay")} value={minPay} onChange={setMinPay} numeric />
+              <Field label={t("maxPay")} value={maxPay} onChange={setMaxPay} numeric />
+              <View style={s.row}>
+                {["", "temporary", "full_time", "part_time", "daily_wage", "weekend", "shift"].map(
+                  (k) => (
+                    <Choice
+                      key={k}
+                      title={t(k || "all")}
+                      selected={employment === k}
+                      onPress={() => setEmployment(k)}
+                    />
+                  ),
+                )}
+              </View>
+              <View style={s.row}>
+                {["", "ta", "en"].map((k) => (
+                  <Choice
+                    key={k}
+                    title={k || t("allLanguages")}
+                    selected={filterLanguage === k}
+                    onPress={() => setFilterLanguage(k)}
+                  />
+                ))}
+              </View>
+              <View style={s.row}>
+                {["", "hour", "day", "job", "month"].map((k) => (
+                  <Choice
+                    key={k}
+                    title={t(k || "allPayUnits")}
+                    selected={payUnit === k}
+                    onPress={() => setPayUnit(k)}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+          <Button
+            title={t("refresh")}
+            secondary
+            disabled={results.isFetching}
+            onPress={() => void results.refetch()}
+          />
+          <Button
+            title={t("enableNearbyAlerts")}
+            secondary
+            onPress={() =>
+              run(async () => {
+                await notificationService.enable();
+                await locationService.alerts(position.latitude, position.longitude, true);
+              }, "alertsSaved")
+            }
+          />
+          <Button
+            title={t("disableNearbyAlerts")}
+            secondary
+            onPress={() =>
+              run(
+                () => locationService.alerts(position.latitude, position.longitude, false),
+                "alertsSaved",
+              )
+            }
+          />
           <Button
             title={t(mapView ? "listView" : "mapView")}
             secondary
@@ -601,27 +679,45 @@ function Jobs({
           {mapView && (
             <JobMap
               position={position}
-              jobs={results.data?.pages.flat() || []}
-              onSelect={setSelected}
-              unavailable={t("serviceUnavailable")}
+              jobs={visibleJobs}
+              onSelect={(job) => setSelected(job)}
+              unavailable={t("mapNotConfigured")}
+              t={t}
             />
           )}
           <AsyncState query={results} t={t} />
-          {results.data?.pages.flat().map((item) => (
-            <View key={item.job.id} style={s.card}>
-              <Text style={s.heading}>{item.job.title}</Text>
-              <Text style={s.body}>
-                {item.job.locality} · {t("approximate")} {item.distance_m / 1000} km
-              </Text>
-              <Text style={s.heading}>
-                ₹{item.job.pay} / {t(item.job.pay_unit)}
-              </Text>
-              <Text style={s.tag}>
-                {item.match_score}% {t("match")}
-              </Text>
-              <Button title={t("details")} secondary onPress={() => setSelected(item.job)} />
-            </View>
-          ))}
+          {!results.isPending && !results.isError && !visibleJobs.length && (
+            <Text style={s.body}>{t("empty")}</Text>
+          )}
+          {!mapView &&
+            visibleJobs.map((item) => (
+              <View key={item.job.id} style={s.card}>
+                <Text style={s.heading}>{item.job.title}</Text>
+                <Text style={s.body}>
+                  {t(item.job.kind)} · {t(item.job.employment_type)} ·{" "}
+                  {categories.find((c) => c.id === item.job.category)?.[
+                    language === "ta" ? "name_ta" : "name_en"
+                  ] || item.job.category}
+                </Text>
+                <Text style={s.body}>
+                  {Math.max(0, Math.ceil((Date.parse(item.job.expires_at) - now) / 60000))}{" "}
+                  {t("minutesLeft")} · {t("posted")}{" "}
+                  {new Date(item.job.published_at).toLocaleTimeString(
+                    language === "ta" ? "ta-IN" : "en-IN",
+                  )}
+                </Text>
+                <Text style={s.body}>
+                  {item.job.locality} · {t("approximate")} {item.distance_m / 1000} km
+                </Text>
+                <Text style={s.heading}>
+                  ₹{item.job.pay} / {t(item.job.pay_unit)}
+                </Text>
+                <Text style={s.tag}>
+                  {item.match_score}% {t("match")}
+                </Text>
+                <Button title={t("details")} secondary onPress={() => setSelected(item.job)} />
+              </View>
+            ))}
           {results.hasNextPage && (
             <Button
               title={t("loadMore")}
@@ -639,6 +735,16 @@ function Jobs({
             {selected && (
               <>
                 <Text style={s.title}>{selected.title}</Text>
+                <Text style={s.body}>
+                  ₹{selected.pay} / {t(selected.pay_unit)} · {t(selected.kind)} ·{" "}
+                  {selected.category}
+                </Text>
+                <Text style={s.body}>
+                  {t("approximate")}{" "}
+                  {(visibleJobs.find((j) => j.job.id === selected.id)?.distance_m || 0) / 1000} km ·{" "}
+                  {Math.max(0, Math.ceil((Date.parse(selected.expires_at) - now) / 60000))}{" "}
+                  {t("minutesLeft")}
+                </Text>
                 <Text style={s.body}>{selected.description}</Text>
                 <Text style={s.body}>
                   {selected.schedule} · {selected.locality}
@@ -708,12 +814,28 @@ function Post({
     required_skills: [],
     employment_type: "temporary",
   });
+  useEffect(() => {
+    if (position)
+      setP((old: any) => ({
+        ...old,
+        locality: position.locality || old.locality,
+        city: position.city || old.city,
+        district: position.district || old.district,
+        state: position.state || old.state,
+        country: position.country || old.country || "IN",
+        exact_address: position.formatted_address || old.exact_address,
+      }));
+  }, [position]);
   const [requestId] = useState(() => Crypto.randomUUID());
   const [draft, setDraft] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const update = (k: string, v: any) => setP((old: any) => ({ ...old, [k]: v }));
   const submit = (publish: boolean) => {
-    const parsed = jobSchema.safeParse({ ...p, ...position });
+    const parsed = jobSchema.safeParse({
+      ...p,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+    });
     if (!parsed.success) {
       setInvalid(true);
       return;
@@ -814,7 +936,11 @@ function Post({
         onChange={(v) => update("required_skills", csv(v))}
       />
       <Button title={t(position ? "refreshLocation" : "gps")} secondary onPress={chooseLocation} />
-      {position && <Text style={s.body}>{t("locationSelected")}</Text>}
+      {position && (
+        <Text style={s.body}>
+          {t("locationSelected")}: {position.label} · {t("privateLocationNote")}
+        </Text>
+      )}
       {invalid && (
         <Text accessibilityRole="alert" style={s.body}>
           {t("validation")}

@@ -42,7 +42,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/marketplace.test.ts src/live/auth-logic.test.ts",
+    "test": "node --experimental-strip-types --test src/marketplace.test.ts src/live/auth-logic.test.ts src/live/location-logic.test.ts",
     "build:web": "expo export --platform web"
   },
   "private": true,

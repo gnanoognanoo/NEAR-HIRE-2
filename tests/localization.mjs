@@ -18,7 +18,7 @@ test("English and Tamil have matching nonempty translation keys", () => {
   for (const [k, v] of Object.entries(ta)) assert.ok(typeof v === "string" && v.length > 0, k);
 });
 test("literal live-screen translation references exist", () => {
-  const source = ["LiveApp.tsx", "PhoneAuth.tsx"]
+  const source = ["LiveApp.tsx", "PhoneAuth.tsx", "LocationPicker.tsx", "LocationPin.tsx", "LocationPin.web.tsx"]
     .map((file) =>
       readFileSync(new URL("../apps/mobile/src/live/" + file, import.meta.url), "utf8"),
     )
