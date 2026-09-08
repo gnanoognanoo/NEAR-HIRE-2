@@ -8,6 +8,7 @@ module.exports = () => ({
       : {}),
   },
   extra: {
+    ...(base.expo.extra || {}),
     ...(process.env.EAS_PROJECT_ID ? { eas: { projectId: process.env.EAS_PROJECT_ID } } : {}),
   },
 });
