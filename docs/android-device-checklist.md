@@ -1,4 +1,4 @@
-# NearHire Android development test checklist
+ NearHire Android development test checklist
 
 Status: PENDING. No APK or physical-device result has been verified.
 
@@ -79,3 +79,35 @@ Sign in on real worker and employer devices using real OTP. Do not bypass auth t
 - [ ] Retry/partial delivery does not resend acknowledged tokens; offline recovery is checked.
 
 Firebase OAuth/HTTP v1 validation and a healthy dispatcher do not prove any handset check above.
+
+## First APK startup gate — 9 September 2026
+
+Pre-build source baseline: d14ab765a122c6154248036d2cc779a0900a4c32. Record the actual EAS build commit/ID when a build is started. Current state: EAS public map style is absent, no APK has been built, and ADB detects no connected phone. Do not label any startup check passed yet.
+
+Complete these checks before marketplace or real OTP testing:
+
+| Check | Expected result | Status |
+| --- | --- | --- |
+| Install and launch | Development APK installs; no native crash | PENDING |
+| Branding and layout | Splash/branding, safe areas, buttons and text render correctly | PENDING |
+| English | Labels readable; language selectable before auth | PENDING |
+| Tamil | Glyphs render, wrapping sensible, no clipping | PENDING |
+| Phone screen | India +91 default; no fake session/demo login | PENDING |
+| Large font scale | Language and phone screens remain usable | PENDING |
+| Firebase startup | Native initialization does not crash | PENDING |
+| Metro | Same-LAN dev-client connection, bundle load and Fast Refresh | PENDING |
+
+The development client needs Metro to load the application screens. Start Metro after installing/opening the development client, before assessing the language/auth screens. The development-client launcher itself does not prove NearHire's JavaScript startup works.
+
+If exactly one authorized physical phone is connected, install the downloaded APK with ADB. Otherwise install from the successful EAS build link and confirm installation. Record model, Android version, build ID, commit and each outcome. Do not capture OTPs or device tokens in shared diagnostics.
+
+If launch crashes, stop before OTP. Inspect package-filtered AndroidRuntime/ReactNative/Expo/MapLibre/Firebase logs, distinguish JavaScript errors from native errors, fix the cause, and rebuild only when native code/configuration changed. Never bypass missing modules or authentication.
+
+### Next stage: real OTP, only after startup passes
+
+- Supply a supported SMS provider's credentials through secure configuration.
+- Enable hosted Supabase Phone Auth with the documented OTP length, expiry and rate limits.
+- Test real +91 OTP, resend/cooldown, wrong code, expired code and network failure.
+- Verify close/reopen session restoration and logout/login.
+- Then test profile → GPS → MapLibre → Ola search → post job → nearby PostGIS discovery → application → acceptance → private contact unlock → completion → rating → FCM events on two real devices.
+- Payments and all authenticated workflows remain deferred; do not create fake sessions for testing.

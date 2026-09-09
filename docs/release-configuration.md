@@ -56,3 +56,13 @@ npx expo start --dev-client --lan
 ```
 
 Follow [Android device checklist](android-device-checklist.md). All physical-device checks are PENDING; authenticated tests wait for real SMS setup. GPS, native rendering, production Ola responses and FCM delivery must be demonstrated on actual devices.
+
+## First-device build attempt — 9 September 2026
+
+Owner subsequently authorized the previously supplied Ola key as a TEMPORARY DEVELOPMENT CREDENTIAL — ROTATE BEFORE PRODUCTION, including client map use for this development test only.
+
+Prepared C:\PROJECTS\NEARHIRE-SECRETS\map-client.env outside Git, containing EXPO_PUBLIC_MAP_STYLE_URL for the requested Ola default-light-standard style. The screenshot-derived credential returned HTTP 401 from the style endpoint. No credential-bearing URL was printed. EAS style configuration was left unchanged; a known rejected style was not bundled into an APK.
+
+The exact key must be supplied in that external file to eliminate OCR ambiguity, and its Ola tile/style entitlement must be confirmed. Tile, glyph, sprite and attribution validation are blocked until the style request succeeds. This failed check does not establish production map licensing or physical rendering.
+
+The latest pre-build checks passed: TypeScript, lint, 15 mobile tests, two localization tests, 24 database/PostGIS scenarios, five Edge type checks, two Edge tests and Android/Hermes export. EAS project/Firebase/public Supabase configuration remains valid. ADB is available but no device is connected. No APK build, installation, language/auth-screen device test, or Metro handset connection has passed.
