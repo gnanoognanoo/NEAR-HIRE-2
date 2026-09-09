@@ -2,6 +2,7 @@
   "expo": {
     "name": "NearHire",
     "slug": "nearhire",
+    "owner": "gnanoos-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -33,6 +34,11 @@
           "locationWhenInUsePermission": "NearHire uses your location to show nearby jobs and workers."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9788df17-3b02-4cd3-b594-8daff14abcad"
+      }
+    }
   }
 }

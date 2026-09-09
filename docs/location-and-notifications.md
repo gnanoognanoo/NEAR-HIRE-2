@@ -1,3 +1,5 @@
+> Current EAS linkage and build status: [Task 3A release configuration](release-configuration.md). Earlier setup observations below are historical.
+
 # Task 3 — Location and notifications
 
 Status: PARTIAL. Repository functionality is implemented and automated checks are recorded below. Production map/geocoding/FCM configuration and physical Android verification remain required. Phone OTP is preserved and real SMS testing remains deferred; there is no production authentication bypass.
