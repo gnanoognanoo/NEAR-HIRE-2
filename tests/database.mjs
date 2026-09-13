@@ -21,6 +21,9 @@ for (const file of [
   "202609060004_categories.sql",
   "202609070001_auth_device_cleanup.sql",
   "202609070002_location_notifications.sql",
+  "202609100001_custom_search_radius.sql",
+  "202609100002_workspaces_worker_discovery.sql",
+  "202609130001_test_payments.sql",
 ]) {
   let sql = await readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8");
   sql = sql.replace(
@@ -233,12 +236,12 @@ await check("payment settlement is server-only, checks amount, and credits once"
     order.id,
   ]);
   await assert.rejects(() =>
-    asUser(worker, () => rpc("settle_payment", ["event1", "pay1", "order_test", 1000, "INR"])),
+    asUser(worker, () => rpc("settle_payment", ["event1", "pay1", "order_test", 900, "INR"])),
   );
   await assert.rejects(() => rpc("settle_payment", ["event1", "pay1", "order_test", 1, "INR"]));
-  await rpc("settle_payment", ["event1", "pay1", "order_test", 1000, "INR"]);
-  await rpc("settle_payment", ["event1", "pay1", "order_test", 1000, "INR"]);
-  await rpc("settle_payment", ["event2", "pay1", "order_test", 1000, "INR"]);
+  await rpc("settle_payment", ["event1", "pay1", "order_test", 900, "INR"]);
+  await rpc("settle_payment", ["event1", "pay1", "order_test", 900, "INR"]);
+  await rpc("settle_payment", ["event2", "pay1", "order_test", 900, "INR"]);
   assert.equal(
     (await pg.query("select balance from public.job_credits where user_id=$1", [worker])).rows[0]
       .balance,
@@ -585,6 +588,427 @@ await check(
       )
     ).rows[0];
     assert.equal(row.last_error, "SUPPRESSED");
+  },
+);
+
+await check("custom radius accepts 1–50 km; rejects malformed and unbounded requests", async () => {
+  for (const metres of [1000, 3000, 10000, 17000, 50000]) await geoQuery(metres);
+  for (const metres of [0, -1000, 51000, 1500, null, "", "NaN", "Infinity", "17km"])
+    await assert.rejects(() => geoQuery(metres));
+  await asUser(geoWorker, () => rpc("save_preferences", [{ radius_m: 17000 }]));
+  assert.equal(
+    (await pg.query("select radius_m from public.worker_profiles where user_id=$1", [geoWorker]))
+      .rows[0].radius_m,
+    17000,
+  );
+  await assert.rejects(() =>
+    asUser(geoWorker, () => rpc("save_preferences", [{ radius_m: 51000 }])),
+  );
+});
+await check("17 km and 50 km PostGIS boundaries preserve privacy, ranking and expiry", async () => {
+  const close = await geoJob(2000),
+    within = await geoJob(16500),
+    outside = await geoJob(17500),
+    edge = await geoJob(49000),
+    beyond = await geoJob(51000),
+    expired = await geoJob(16000);
+  await pg.query("update public.jobs set title='Custom radius boundary' where id=any($1::uuid[])", [
+    [close, within, outside, edge, beyond, expired],
+  ]);
+  await pg.query(
+    "update public.jobs set published_at=now()-interval '25 hours',expires_at=now()-interval '1 hour' where id=$1",
+    [expired],
+  );
+  const query = (r) => geoQuery(r, { query: "Custom radius boundary", sort: "nearest" });
+  const rows17 = (await query(17000)).rows;
+  assert.deepEqual(
+    rows17.map((r) => r.job.id),
+    [close, within],
+  );
+  assert.deepEqual(
+    (await query(10000)).rows.map((r) => r.job.id),
+    [close],
+  );
+  assert.deepEqual(
+    (await query(50000)).rows.map((r) => r.job.id),
+    [close, within, outside, edge],
+  );
+  assert.ok(rows17[0].match_score > rows17[1].match_score);
+  for (const row of rows17) {
+    assert.equal(row.distance_m % 500, 0);
+    assert.ok(!("exact_address" in row.job));
+    assert.ok(!("latitude" in row.job));
+    assert.equal(Number(row.approx_lat.toFixed(2)), row.approx_lat);
+  }
+});
+await check("wide-radius pagination stays at twenty rows with no repeated IDs", async () => {
+  for (let i = 0; i < 23; i++) {
+    const id = await geoJob(10000 + i * 200);
+    await pg.query("update public.jobs set title='Custom pagination' where id=$1", [id]);
+  }
+  const first = (await geoQuery(50000, { query: "Custom pagination" }, 0)).rows,
+    second = (await geoQuery(50000, { query: "Custom pagination" }, 20)).rows;
+  assert.equal(first.length, 20);
+  assert.equal(second.length, 3);
+  assert.equal(new Set([...first, ...second].map((r) => r.job.id)).size, 23);
+});
+
+await check("workspace switch retains identity/credits and validates modes", async () => {
+  const before = (
+    await pg.query("select balance from public.job_credits where user_id=$1", [owner])
+  ).rows[0].balance;
+  await asUser(owner, () => rpc("set_workspace", ["post"]));
+  await asUser(owner, () => rpc("set_workspace", ["find"]));
+  assert.equal(
+    (await pg.query("select last_workspace from public.profiles where id=$1", [owner])).rows[0]
+      .last_workspace,
+    "find",
+  );
+  assert.equal(
+    (await pg.query("select balance from public.job_credits where user_id=$1", [owner])).rows[0]
+      .balance,
+    before,
+  );
+  await assert.rejects(() => asUser(owner, () => rpc("set_workspace", ["admin"])));
+});
+const discover = async (offset = 0, radius = 3000) =>
+  asUser(owner, () =>
+    pg.query("select * from public.nearby_available_workers(13.085,80.21,$1,'{}',$2)", [
+      radius,
+      offset,
+    ]),
+  );
+await check(
+  "worker discovery is opt-in and exposes only coarsened allowlisted fields",
+  async () => {
+    await pg.query("delete from public.blocked_users");
+    await pg.query("update public.profiles set suspended=false,visible=true");
+    await pg.query("update public.worker_profiles set available=true,discoverable_for_hire=false");
+    await asUser(worker, () => rpc("set_worker_location", [13.086123, 80.214567, true]));
+    assert.equal((await discover()).rows.length, 0);
+    await asUser(worker, () => rpc("set_worker_discovery", [true, 13.086123, 80.214567]));
+    const rows = (await discover()).rows;
+    assert.equal(rows.length, 1);
+    const w = rows[0];
+    assert.equal(w.approx_lat, 13.09);
+    assert.equal(w.approx_lng, 80.21);
+    assert.equal(w.distance_m % 500, 0);
+    assert.deepEqual(
+      Object.keys(w).sort(),
+      [
+        "worker_id",
+        "name",
+        "locality",
+        "skills",
+        "categories",
+        "employment_types",
+        "rating",
+        "distance_m",
+        "approx_lat",
+        "approx_lng",
+      ].sort(),
+    );
+    await assert.rejects(() =>
+      asUser(owner, () => pg.query("select * from private.worker_locations")),
+    );
+  },
+);
+await check(
+  "worker availability, consent, suspension, visibility and bidirectional blocks are enforced",
+  async () => {
+    for (const [table, column] of [
+      ["worker_profiles", "available"],
+      ["worker_profiles", "discoverable_for_hire"],
+      ["profiles", "visible"],
+    ]) {
+      const id = table === "profiles" ? "id" : "user_id";
+      await pg.query("update public." + table + " set " + column + "=false where " + id + "=$1", [
+        worker,
+      ]);
+      assert.equal((await discover()).rows.length, 0);
+      await pg.query("update public." + table + " set " + column + "=true where " + id + "=$1", [
+        worker,
+      ]);
+    }
+    await pg.query("update public.profiles set suspended=true where id=$1", [worker]);
+    assert.equal((await discover()).rows.length, 0);
+    await pg.query("update public.profiles set suspended=false where id=$1", [worker]);
+    for (const ids of [
+      [owner, worker],
+      [worker, owner],
+    ]) {
+      await pg.query("insert into public.blocked_users values($1,$2)", ids);
+      assert.equal((await discover()).rows.length, 0);
+      await pg.query("delete from public.blocked_users");
+    }
+    await asUser(worker, () => rpc("set_worker_discovery", [false]));
+    assert.equal((await discover()).rows.length, 0);
+  },
+);
+await check("worker radius validation and stable twenty-row pagination", async () => {
+  for (let i = 1; i <= 23; i++) {
+    const id = "90000000-0000-0000-0000-" + String(i).padStart(12, "0");
+    await pg.query("insert into auth.users(id,phone) values($1,$2)", [
+      id,
+      "+91880000" + String(i).padStart(4, "0"),
+    ]);
+    await asUser(id, () => rpc("set_worker_discovery", [true, 13.086, 80.214]));
+  }
+  const first = (await discover()).rows,
+    second = (await discover(20)).rows;
+  assert.equal(first.length, 20);
+  assert.equal(second.length, 3);
+  assert.equal(new Set([...first, ...second].map((w) => w.worker_id)).size, 23);
+  for (const radius of [1000, 17000, 50000]) assert.ok((await discover(0, radius)).rows.length > 0);
+  for (const radius of [0, 999, 1500, 51000]) await assert.rejects(() => discover(0, radius));
+  await pg.exec("set role anon");
+  try {
+    await assert.rejects(() => pg.query("select * from public.nearby_available_workers(13,80)"));
+  } finally {
+    await pg.exec("reset role");
+  }
+});
+
+const buyer = "91000000-0000-0000-0000-000000000001";
+await pg.query("insert into auth.users values($1,$2)", [buyer, "+919000000091"]);
+await check(
+  "launch packages are authoritative and inactive packages cannot be bought",
+  async () => {
+    const rows = (
+      await pg.query(
+        "select id,credits,amount_paise from public.credit_packages where active order by credits",
+      )
+    ).rows;
+    assert.deepEqual(rows, [
+      { id: "single", credits: 1, amount_paise: 900 },
+      { id: "five", credits: 5, amount_paise: 3900 },
+      { id: "ten", credits: 10, amount_paise: 6900 },
+    ]);
+    await assert.rejects(() =>
+      asUser(buyer, () => rpc("prepare_payment", ["twenty-five", crypto.randomUUID()])),
+    );
+    await assert.rejects(() =>
+      asUser(buyer, () => pg.exec("update public.credit_packages set amount_paise=1")),
+    );
+    await assert.rejects(() =>
+      asUser(buyer, () => rpc("prepare_payment", ["single", crypto.randomUUID(), 1])),
+    );
+  },
+);
+await check("starter award survives relogin and mode changes without duplication", async () => {
+  await asUser(buyer, () => rpc("set_workspace", ["find"]));
+  await asUser(buyer, () => rpc("set_workspace", ["post"]));
+  assert.equal(
+    (await pg.query("select balance from public.job_credits where user_id=$1", [buyer])).rows[0]
+      .balance,
+    5,
+  );
+  assert.equal(
+    (
+      await pg.query(
+        "select count(*)::int n from public.credit_transactions where user_id=$1 and reason='signup'",
+        [buyer],
+      )
+    ).rows[0].n,
+    1,
+  );
+});
+for (const [pack, amount, credits] of [
+  ["single", 900, 1],
+  ["five", 3900, 5],
+  ["ten", 6900, 10],
+])
+  await check(
+    `purchase ${pack}: exact award, repeated verification/webhook, owner RLS`,
+    async () => {
+      const request = crypto.randomUUID();
+      const o = await asUser(buyer, () => rpc("prepare_payment", [pack, request]));
+      assert.equal(o.amount_paise, amount);
+      assert.equal(o.credits, credits);
+      assert.equal((await asUser(buyer, () => rpc("prepare_payment", [pack, request]))).id, o.id);
+      await assert.rejects(() =>
+        asUser(buyer, () =>
+          rpc("prepare_payment", [pack === "single" ? "five" : "single", request]),
+        ),
+      );
+      await pg.query("update public.payment_orders set provider_order_id=$1 where id=$2", [
+        "order_" + pack,
+        o.id,
+      ]);
+      assert.equal(
+        (
+          await asUser(worker, () =>
+            pg.query("select * from public.payment_orders where id=$1", [o.id]),
+          )
+        ).rows.length,
+        0,
+      );
+      await assert.rejects(() =>
+        asUser(buyer, () =>
+          pg.query("update public.payment_orders set status='paid' where id=$1", [o.id]),
+        ),
+      );
+      const before = (
+        await pg.query("select balance from public.job_credits where user_id=$1", [buyer])
+      ).rows[0].balance;
+      await assert.rejects(() =>
+        rpc("settle_payment", ["bad" + pack, "pay_" + pack, "order_" + pack, amount + 1, "INR"]),
+      );
+      await rpc("settle_payment", ["verify" + pack, "pay_" + pack, "order_" + pack, amount, "INR"]);
+      await rpc("settle_payment", [
+        "webhook" + pack,
+        "pay_" + pack,
+        "order_" + pack,
+        amount,
+        "INR",
+      ]);
+      await rpc("settle_payment", [
+        "webhook" + pack,
+        "pay_" + pack,
+        "order_" + pack,
+        amount,
+        "INR",
+      ]);
+      assert.equal(
+        (await pg.query("select balance from public.job_credits where user_id=$1", [buyer])).rows[0]
+          .balance,
+        before + credits,
+      );
+      assert.equal(
+        (
+          await pg.query(
+            "select count(*)::int n from public.credit_transactions where reference=$1",
+            ["payment:pay_" + pack],
+          )
+        ).rows[0].n,
+        1,
+      );
+      await assert.rejects(() =>
+        rpc("settle_payment", ["another" + pack, "pay_different", "order_" + pack, amount, "INR"]),
+      );
+    },
+  );
+await check("disabled purchases and forged ledger writes are rejected", async () => {
+  await pg.exec("update public.payment_config set payments_enabled_test=false");
+  await assert.rejects(() =>
+    asUser(buyer, () => rpc("prepare_payment", ["single", crypto.randomUUID()])),
+  );
+  await pg.exec("update public.payment_config set payments_enabled_test=true");
+  await assert.rejects(() =>
+    asUser(buyer, () =>
+      pg.query(
+        "insert into public.credit_transactions(user_id,delta,reason,reference) values($1,100,'purchase','forged')",
+        [buyer],
+      ),
+    ),
+  );
+  await assert.rejects(() =>
+    asUser(buyer, () => pg.exec("update public.payment_config set live_enabled=true")),
+  );
+});
+await check(
+  "failed events award zero; refunds record status without silently clawing credits",
+  async () => {
+    const o = await asUser(buyer, () => rpc("prepare_payment", ["single", crypto.randomUUID()]));
+    await pg.query(
+      "update public.payment_orders set provider_order_id='order_failed' where id=$1",
+      [o.id],
+    );
+    const before = (
+      await pg.query("select balance from public.job_credits where user_id=$1", [buyer])
+    ).rows[0].balance;
+    await rpc("record_payment_event", ["failed1", "pay_failed", "order_failed", "failed"]);
+    await rpc("record_payment_event", ["refund1", "pay_five", "order_five", "refunded"]);
+    await rpc("record_payment_event", ["refund1", "pay_five", "order_five", "refunded"]);
+    assert.equal(
+      (await pg.query("select balance from public.job_credits where user_id=$1", [buyer])).rows[0]
+        .balance,
+      before,
+    );
+    assert.equal(
+      (
+        await pg.query(
+          "select status from public.payment_orders where provider_order_id='order_five'",
+        )
+      ).rows[0].status,
+      "refunded",
+    );
+  },
+);
+await check("account deletion retains detached orders, payments and ledger", async () => {
+  await pg.query("delete from auth.users where id=$1", [buyer]);
+  assert.equal(
+    (
+      await pg.query(
+        "select count(*)::int n from public.payment_orders where provider_order_id in ('order_single','order_five','order_ten') and user_id is null",
+      )
+    ).rows[0].n,
+    3,
+  );
+  assert.equal(
+    (
+      await pg.query(
+        "select count(*)::int n from public.payments where id in ('pay_single','pay_five','pay_ten')",
+      )
+    ).rows[0].n,
+    3,
+  );
+  assert.equal(
+    (
+      await pg.query(
+        "select count(*)::int n from public.credit_transactions where reference='payment:pay_five' and user_id is null",
+      )
+    ).rows[0].n,
+    1,
+  );
+});
+
+await check(
+  "one credit publishes to zero; failed publish rolls back; zero blocks repost",
+  async () => {
+    const u = "92000000-0000-0000-0000-000000000001";
+    await pg.query("insert into auth.users values($1,$2)", [u, "+919000000092"]);
+    await asUser(u, () =>
+      rpc("save_profile", [{ name: "Payment test", locality: "Anna Nagar", languages: ["ta"] }]),
+    );
+    await pg.query(
+      "insert into public.credit_transactions(user_id,delta,reason,reference) values($1,-4,'test_setup','test-credit-setup')",
+      [u],
+    );
+    await pg.query("update public.job_credits set balance=1 where user_id=$1", [u]);
+    const id = await asUser(u, () => rpc("create_job", [input, crypto.randomUUID()]));
+    await asUser(u, () => rpc("publish_job", [id]));
+    await asUser(u, () => rpc("publish_job", [id]));
+    assert.equal(
+      (await pg.query("select balance from public.job_credits where user_id=$1", [u])).rows[0]
+        .balance,
+      0,
+    );
+    const draft = await asUser(u, () => rpc("create_job", [input, crypto.randomUUID()]));
+    await assert.rejects(() => asUser(u, () => rpc("publish_job", [draft])));
+    assert.equal(
+      (await pg.query("select status from public.jobs where id=$1", [draft])).rows[0].status,
+      "draft",
+    );
+    await pg.query(
+      "update public.jobs set published_at=now()-interval '25 hours',expires_at=now()-interval '1 hour' where id=$1",
+      [id],
+    );
+    await assert.rejects(() => asUser(u, () => rpc("repost_job", [id, crypto.randomUUID()])));
+    assert.equal(
+      (await pg.query("select count(*)::int n from public.jobs where repost_of=$1", [id])).rows[0]
+        .n,
+      0,
+    );
+    assert.equal(
+      (
+        await pg.query(
+          "select sum(delta)::int n from public.credit_transactions where user_id=$1",
+          [u],
+        )
+      ).rows[0].n,
+      0,
+    );
   },
 );
 console.log(

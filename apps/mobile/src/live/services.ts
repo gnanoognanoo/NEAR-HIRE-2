@@ -1,6 +1,7 @@
-import { coordinates, boundedLocation } from "./location-logic";
+import { validateRadiusMetres } from "./radius-logic";
+import { coordinates } from "./location-logic";
 import { normalizePhone, createAuthGate } from "./auth-logic";
-import * as Location from "expo-location";
+import { deviceLocation } from "./device-location";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { backend, edge, rpc, storage } from "./client";
@@ -85,7 +86,7 @@ export const jobService = {
     rpc<any[]>("nearby_jobs", {
       p_lat: lat,
       p_lng: lng,
-      p_radius: radius,
+      p_radius: validateRadiusMetres(radius),
       p_filter: filter,
       p_offset: offset,
     }),
@@ -133,18 +134,7 @@ export type Place = {
   formatted_address?: string;
 };
 export const locationService = {
-  async gps() {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== "granted")
-      throw new Error(
-        permission.canAskAgain ? "LOCATION_PERMISSION_DENIED" : "LOCATION_PERMISSION_PERMANENT",
-      );
-    if (!(await Location.hasServicesEnabledAsync())) throw new Error("GPS_DISABLED");
-    const p = await boundedLocation(
-      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-    );
-    return coordinates(p.coords.latitude, p.coords.longitude);
-  },
+  gps: deviceLocation,
   search: (query: string) => edge<Place[]>("location", { action: "search", query }),
   resolve: (id: string) => edge<Place>("location", { action: "resolve", id }),
   reverse: (latitude: number, longitude: number) =>
@@ -181,13 +171,26 @@ export const notificationService = {
   },
 };
 export const creditService = {
+  async history(offset = 0) {
+    const { data, error } = await backend()
+      .from("credit_transactions")
+      .select("id,delta,reason,created_at,metadata")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + 29);
+    if (error) throw error;
+    return data;
+  },
   async balance() {
     const { data, error } = await backend().from("job_credits").select("balance").single();
     if (error) throw error;
     return data.balance as number;
   },
   async packages() {
-    const { data, error } = await backend().from("credit_packages").select("*").eq("active", true);
+    const { data, error } = await backend()
+      .from("credit_packages")
+      .select("*")
+      .eq("active", true)
+      .order("sort_order");
     if (error) throw error;
     return data;
   },

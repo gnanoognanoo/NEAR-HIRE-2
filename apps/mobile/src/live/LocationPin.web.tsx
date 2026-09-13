@@ -1,3 +1,4 @@
+import "./map-worker.web";
 import React, { useEffect, useRef, useState } from "react";
 import { Text } from "react-native";
 import * as maplibregl from "maplibre-gl";
@@ -5,7 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { PinProps } from "./LocationPin";
 import { configuredMapProvider } from "./location-logic";
 import { Button, styles as s } from "./ui";
-export default function LocationPin({ position, onMove, t }: PinProps) {
+export default function LocationPin({ position, onMove, t, zoom = 15, fill = false }: PinProps) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
@@ -22,13 +23,19 @@ export default function LocationPin({ position, onMove, t }: PinProps) {
         container: ref.current,
         style,
         center: [position.longitude, position.latitude],
-        zoom: 15,
+        zoom,
       });
     } catch {
       setFailed(true);
       return;
     }
     mapRef.current = map;
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.on("load", () => {
+      if (ref.current) ref.current.dataset.mapReady = "true";
+    });
+    const resize = new ResizeObserver(() => map.resize());
+    resize.observe(ref.current!);
     const marker = new maplibregl.Marker({ color: "#6941A5", draggable: true })
       .setLngLat([position.longitude, position.latitude])
       .addTo(map);
@@ -40,6 +47,7 @@ export default function LocationPin({ position, onMove, t }: PinProps) {
     map.on("click", (e) => move.current({ latitude: e.lngLat.lat, longitude: e.lngLat.lng }));
     map.on("error", () => setFailed(true));
     return () => {
+      resize.disconnect();
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
@@ -64,8 +72,21 @@ export default function LocationPin({ position, onMove, t }: PinProps) {
           }}
         />
       )}
-      {style && <div aria-label={t("privatePin")} ref={ref} style={{ height: 320 }} />}
-      <Text style={s.body}>{t("movePin")}</Text>
+      {style && (
+        <div
+          aria-label={t("privatePin")}
+          ref={ref}
+          style={{
+            height: fill ? "100%" : "42vh",
+            minHeight: fill ? 0 : 290,
+            maxHeight: fill ? undefined : 420,
+            width: "100%",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        />
+      )}
+      {!fill && <Text style={s.body}>{t("movePin")}</Text>}
     </>
   );
 }

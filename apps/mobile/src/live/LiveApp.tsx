@@ -1,13 +1,49 @@
+import PaymentPackages from "./PaymentPackages";
+import JobSummary from "./JobSummary";
+import AccountPanel, { WorkspaceChooser } from "./AccountPanel";
+import NearbyWorkers from "./NearbyWorkers";
+import {
+  parseWorkspace,
+  workspaceHome,
+  workspaceTabs,
+  routeLabel,
+  backDestination,
+  type Workspace,
+} from "./workspace";
+import { creditBalanceKey } from "./credit-query";
+import DistanceControl from "./DistanceControl";
+import { validateRadiusMetres } from "./radius-logic";
+import {
+  JobCreditBalance,
+  PublishConfirmation,
+  CreditBalanceChip,
+  PublishCost,
+} from "./JobCreditBalance";
 import LocationPicker from "./LocationPicker";
 import { activeNearby, type Position } from "./location-logic";
 import PhoneAuth from "./PhoneAuth";
 import { profileComplete, restoredSession, authErrorKey, withAuthTimeout } from "./auth-logic";
 import React, { useEffect, useState, useRef, createContext, useContext } from "react";
-import { ActivityIndicator, Linking, Modal, ScrollView, Text, View, Pressable } from "react-native";
+import {
+  Platform,
+  ActivityIndicator,
+  BackHandler,
+  Linking,
+  Modal,
+  ScrollView,
+  Text,
+  View,
+  Pressable,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Session } from "@supabase/supabase-js";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { db, configured, edge, rpc } from "./client";
 import { openCheckout } from "./checkout";
@@ -23,7 +59,7 @@ import {
   reviewService,
 } from "./services";
 import { Button, Choice, Field, styles as s, colors } from "./ui";
-import JobMap from "./JobMap";
+import DiscoverySurface from "./DiscoverySurface";
 import en from "./locales/en.json";
 import ta from "./locales/ta.json";
 import { jobSchema } from "../../../../packages/core/validation";
@@ -76,7 +112,10 @@ export default function LiveApp() {
   const [bootAttempt, setBootAttempt] = useState(0);
   const [boot, setBoot] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
-  const [screen, setScreen] = useState("home");
+  const [screen, setScreen] = useState("jobs");
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const restoredWorkspaceUser = useRef<string | null>(null);
+  const [searchRadius, setSearchRadius] = useState(3000);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -113,7 +152,7 @@ export default function LiveApp() {
       if (newSession) setBootError(false);
       if (!newSession) {
         qc.clear();
-        setScreen("home");
+        setScreen("jobs");
         setPosition(null);
         setLocationOpen(false);
         setError("");
@@ -135,6 +174,51 @@ export default function LiveApp() {
     queryFn: profileService.get,
     enabled: !!session,
   });
+  useEffect(() => {
+    if (!session) {
+      restoredWorkspaceUser.current = null;
+      setWorkspace(null);
+      return;
+    }
+    if (profile.data && restoredWorkspaceUser.current !== session.user.id) {
+      restoredWorkspaceUser.current = session.user.id;
+      const w = parseWorkspace(profile.data.last_workspace);
+      setWorkspace(w);
+      if (w) setScreen(workspaceHome(w));
+    }
+  }, [session?.user.id, profile.data]);
+  const switchWorkspace = async (w: Workspace) => {
+    try {
+      await rpc("set_workspace", { p_workspace: w });
+      setWorkspace(w);
+      setScreen(workspaceHome(w));
+      await qc.invalidateQueries({ queryKey: ["profile"] });
+    } catch {
+      setError("workspaceSaveError");
+    }
+  };
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (!workspace) return false;
+      const next = backDestination(screen, workspace);
+      if (!next) return false;
+      setScreen(next);
+      return true;
+    });
+    return () => sub.remove();
+  }, [screen, workspace]);
+  const workerPreferences = useQuery({
+    queryKey: ["preferences"],
+    queryFn: profileService.getPreferences,
+    enabled: !!session,
+  });
+  useEffect(() => {
+    try {
+      setSearchRadius(validateRadiusMetres(workerPreferences.data?.radius_m ?? 3000));
+    } catch {
+      setSearchRadius(3000);
+    }
+  }, [workerPreferences.data?.radius_m, session?.user.id]);
   const categories = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -148,6 +232,7 @@ export default function LiveApp() {
     setLanguage(l);
     AsyncStorage.setItem("nearhire.language", l).catch(() => setError("genericError"));
   };
+  const [creditOverlay, setCreditOverlay] = useState(false);
   const run: Run = async (fn, success = "success") => {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -211,38 +296,58 @@ export default function LiveApp() {
       language={language}
       t={t}
       busy={busy}
-      onSave={(p) => run(() => profileService.save(p))}
+      onSave={(p) =>
+        run(async () => {
+          await profileService.save(p);
+          setScreen("profile");
+        })
+      }
     />
+  ) : !workspace ? (
+    <WorkspaceChooser t={t} onChoose={(w) => void switchWorkspace(w)} />
   ) : (
     <>
-      {screen === "home" && (
+      {["editProfile", "credits", "settings", "preferences", "post"].includes(screen) && (
+        <Button
+          title={t("back")}
+          secondary
+          onPress={() => setScreen(backDestination(screen, workspace) || workspaceHome(workspace))}
+        />
+      )}
+      {screen === "credits" && (
         <>
-          <Text style={s.title}>{t("welcome")}</Text>
-          <Text style={s.body}>
-            {profile.data.name} · {profile.data.locality}
-          </Text>
-          <Text style={s.heading}>{t("what")}</Text>
-          <Button title={t("find")} onPress={() => setScreen("jobs")} />
-          <Button title={t("post")} secondary onPress={() => setScreen("post")} />
-          <Text style={s.body}>{t("privacy")}</Text>
-          <Button title={t("preferences")} secondary onPress={() => setScreen("preferences")} />
-          <Button title={t("saved")} secondary onPress={() => setScreen("saved")} />
+          <Button title={t("profile")} secondary onPress={() => setScreen("profile")} />
+          <Text style={s.title}>{t("profileCredits")}</Text>
+          <Credits t={t} />
         </>
       )}
-      {screen === "jobs" && (
+      <View style={{ flex: 1, display: screen === "jobs" ? "flex" : "none" }}>
         <Jobs
+          radius={searchRadius}
+          setRadius={setSearchRadius}
           loadMoreRef={loadNextJobs}
           t={t}
           position={position}
           chooseLocation={() => setLocationOpen(true)}
+          onLocated={setPosition}
           run={run}
           busy={busy}
           categories={categories.data || []}
           language={language}
         />
-      )}
+      </View>
+      <View style={{ flex: 1, display: screen === "workers" ? "flex" : "none" }}>
+        <NearbyWorkers
+          position={position}
+          t={t}
+          onLocation={() => setLocationOpen(true)}
+          onLocated={setPosition}
+          onPost={() => setScreen("post")}
+        />
+      </View>
       {screen === "post" && (
         <Post
+          openCredits={() => setCreditOverlay(true)}
           t={t}
           position={position}
           chooseLocation={() => setLocationOpen(true)}
@@ -250,11 +355,25 @@ export default function LiveApp() {
           language={language}
           busy={busy}
           run={run}
-          onDone={() => setScreen("activity")}
+          onDone={() => setScreen("posts")}
         />
       )}
-      {["activity", "saved"].includes(screen) && (
-        <Activity key={screen} t={t} run={run} busy={busy} saved={screen === "saved"} />
+      {screen === "posts" && (
+        <View style={s.row}>
+          <Button title={t("postAJob")} onPress={() => setScreen("post")} />
+          <Button title={t("nearbyWorkers")} secondary onPress={() => setScreen("workers")} />
+        </View>
+      )}
+      {["applications", "posts", "applicants", "saved"].includes(screen) && (
+        <Activity
+          openCredits={() => setCreditOverlay(true)}
+          key={screen}
+          t={t}
+          run={run}
+          busy={busy}
+          saved={screen === "saved"}
+          initialMode={screen}
+        />
       )}
       {screen === "notifications" && <Updates t={t} run={run} />}
       {screen === "preferences" && (
@@ -267,14 +386,34 @@ export default function LiveApp() {
         />
       )}
       {screen === "profile" && (
+        <AccountPanel
+          profile={profile.data}
+          workspace={workspace}
+          t={t}
+          phoneVerified={!!session.user.phone_confirmed_at}
+          onSwitch={(w) => void switchWorkspace(w)}
+          onNavigate={setScreen}
+        />
+      )}
+      {screen === "editProfile" && (
         <>
           <ProfileForm
             initial={profile.data}
             language={language}
             t={t}
             busy={busy}
-            onSave={(p) => run(() => profileService.save(p))}
+            onSave={(p) =>
+              run(async () => {
+                await profileService.save(p);
+                setScreen("profile");
+              })
+            }
           />
+        </>
+      )}
+      {screen === "settings" && (
+        <>
+          <Text style={s.title}>{t("settings")}</Text>
           <View style={s.row}>
             <Choice
               title="English"
@@ -294,7 +433,7 @@ export default function LiveApp() {
             />
           </View>
           <Button title={t("preferences")} secondary onPress={() => setScreen("preferences")} />
-          <Credits t={t} />
+          <Button title={t("credits")} secondary onPress={() => setScreen("credits")} />
           <Button
             title={t("enablePush")}
             secondary
@@ -315,6 +454,20 @@ export default function LiveApp() {
   );
   return (
     <FeedbackContext.Provider value={{ error, message, busy, t }}>
+      {creditOverlay && (
+        <Modal visible={creditOverlay} onRequestClose={() => setCreditOverlay(false)}>
+          <SafeAreaView style={s.page}>
+            <ScrollView contentContainerStyle={s.content}>
+              <Button
+                title={t("returnJobReview")}
+                secondary
+                onPress={() => setCreditOverlay(false)}
+              />
+              <Credits t={t} />
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+      )}
       <SafeAreaView style={s.page}>
         <View
           style={{
@@ -324,10 +477,15 @@ export default function LiveApp() {
             borderColor: colors.line,
           }}
         >
-          <Text style={s.brand}>
-            {t("brand")}
-            <Text style={{ color: colors.accent }}>.</Text>
-          </Text>
+          <View style={[s.row, { justifyContent: "space-between", flexWrap: "nowrap" }]}>
+            <Text style={s.brand}>
+              {t("brand")}
+              <Text style={{ color: colors.accent }}>.</Text>
+            </Text>
+            {session && workspace === "post" && (
+              <LiveCreditChip t={t} onOpen={() => setScreen("credits")} />
+            )}
+          </View>
         </View>
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -339,7 +497,16 @@ export default function LiveApp() {
             )
               loadNextJobs.current();
           }}
-          contentContainerStyle={s.content}
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            s.content,
+            ["jobs", "workers"].includes(screen) &&
+            workspace &&
+            session &&
+            profileComplete(profile.data)
+              ? { flex: 1, padding: 0, gap: 0 }
+              : {},
+          ]}
         >
           {!!error && (
             <View accessibilityRole="alert" style={s.error}>
@@ -353,28 +520,33 @@ export default function LiveApp() {
           )}
           {busy && <ActivityIndicator color={colors.accent} />} {content}
         </ScrollView>
-        {!!session && profileComplete(profile.data) && (
+        {!!session && !!workspace && profileComplete(profile.data) && (
           <View style={s.nav}>
-            {["home", "jobs", "activity", "notifications", "profile"].map((k) => (
+            {workspaceTabs(workspace!).map((k) => (
               <View key={k} style={s.navItem}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ selected: screen === k }}
+                  accessibilityState={{
+                    selected: screen === k || (k === "profile" && screen === "credits"),
+                  }}
                   onPress={() => {
                     setScreen(k);
                     setError("");
                     setMessage("");
                   }}
-                  style={{ minHeight: 48, padding: 4, justifyContent: "center" }}
+                  style={{ minHeight: 48, padding: 4, justifyContent: "center", width: "100%" }}
                 >
                   <Text
                     style={{
                       fontSize: 12,
                       textAlign: "center",
-                      color: screen === k ? colors.accent : colors.muted,
+                      color:
+                        screen === k || (k === "profile" && screen === "credits")
+                          ? colors.accent
+                          : colors.muted,
                     }}
                   >
-                    {t(k)}
+                    {t(routeLabel(k))}
                   </Text>
                 </Pressable>
               </View>
@@ -383,7 +555,7 @@ export default function LiveApp() {
         )}
         <Modal visible={locationOpen} onRequestClose={() => setLocationOpen(false)}>
           <SafeAreaView style={s.page}>
-            <ScrollView contentContainerStyle={s.content}>
+            <View style={{ flex: 1 }}>
               <Feedback />
               <Button title={t("close")} secondary onPress={() => setLocationOpen(false)} />
               <LocationPicker
@@ -394,7 +566,7 @@ export default function LiveApp() {
                   setLocationOpen(false);
                 }}
               />
-            </ScrollView>
+            </View>
           </SafeAreaView>
         </Modal>
       </SafeAreaView>
@@ -453,28 +625,32 @@ function ProfileForm({
   );
 }
 function Jobs({
+  radius,
+  setRadius,
   loadMoreRef,
   t,
   position,
   chooseLocation,
+  onLocated,
   run,
   busy,
   categories,
   language,
 }: {
+  radius: number;
+  setRadius: (value: number) => void;
   loadMoreRef: React.RefObject<() => void>;
   t: Translate;
   position: Position | null;
   chooseLocation: () => void;
+  onLocated: (p: Position) => void;
   run: Run;
   busy: boolean;
   categories: any[];
   language: Lang;
 }) {
-  const [mapView, setMapView] = useState(false);
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [radius, setRadius] = useState(3000);
   const [kind, setKind] = useState("");
   const [category, setCategory] = useState("");
   const [sort, setSort] = useState("recommended");
@@ -483,18 +659,22 @@ function Jobs({
   const [employment, setEmployment] = useState("");
   const [filterLanguage, setFilterLanguage] = useState("");
   const [payUnit, setPayUnit] = useState("");
-  const [advanced, setAdvanced] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
   const [selected, setSelected] = useState<any>(null);
+  const [confirmApply, setConfirmApply] = useState(false);
+  const [appliedIds, setAppliedIds] = useState<string[]>([]);
+  const applyGate = useRef(false);
+  useEffect(() => setConfirmApply(false), [selected?.id]);
   useEffect(() => {
     const id = setTimeout(() => setDebounced(query), 350);
     return () => clearTimeout(id);
   }, [query]);
   const results = useInfiniteQuery({
+    placeholderData: keepPreviousData,
     queryKey: [
       "jobs",
       position,
@@ -545,187 +725,175 @@ function Jobs({
     if (selected && Date.parse(selected.expires_at) <= now) setSelected(null);
   }, [selected, now]);
   return (
-    <>
-      <Text style={s.title}>{t("nearby")}</Text>
-      <Button
-        title={t(position ? "refreshLocation" : "select")}
-        secondary
-        onPress={chooseLocation}
-      />
+    <View style={{ flex: 1 }}>
       {!position ? (
-        <Text style={s.body}>{t("noLocation")}</Text>
+        <View style={s.content}>
+          <Text style={s.body}>{t("noLocation")}</Text>
+          <Button title={t("select")} onPress={chooseLocation} />
+        </View>
       ) : (
-        <>
-          <Text style={s.body}>{position.label || t("selectedLocation")}</Text>
-          <Field label={t("search")} value={query} onChange={setQuery} />
-          <View style={s.row}>
-            {["", "residential", "business"].map((k) => (
-              <Choice
-                key={k}
-                title={t(k || "all")}
-                selected={kind === k}
-                onPress={() => {
-                  setKind(k);
-                  setCategory("");
-                }}
-              />
-            ))}
-          </View>
-          <ScrollView horizontal>
-            <View style={s.row}>
-              <Choice title={t("all")} selected={!category} onPress={() => setCategory("")} />
-              {categories
-                .filter((c) => !kind || c.kind === kind)
-                .map((c) => (
-                  <Choice
-                    key={c.id}
-                    title={language === "ta" ? c.name_ta : c.name_en}
-                    selected={category === c.id}
-                    onPress={() => setCategory(c.id)}
-                  />
-                ))}
-            </View>
-          </ScrollView>
-          <View style={s.row}>
-            {[1000, 3000, 5000].map((r) => (
-              <Choice
-                key={r}
-                title={`${r / 1000} km`}
-                selected={radius === r}
-                onPress={() => setRadius(r)}
-              />
-            ))}
-          </View>
-          <View style={s.row}>
-            {["recommended", "nearest", "pay", "newest"].map((k) => (
-              <Choice
-                key={k}
-                title={t(k === "pay" ? "paySort" : k)}
-                selected={sort === k}
-                onPress={() => setSort(k)}
-              />
-            ))}
-          </View>
-          <Button title={t("filters")} secondary onPress={() => setAdvanced(!advanced)} />
-          {advanced && (
+        <DiscoverySurface
+          position={position}
+          jobs={visibleJobs}
+          radius={radius}
+          onRadius={setRadius}
+          t={t}
+          query={query}
+          onQuery={setQuery}
+          kind={kind}
+          onKind={(k) => {
+            setKind(k);
+            setCategory("");
+          }}
+          locality={position.label || t("selectedLocation")}
+          onLocation={chooseLocation}
+          onLocated={onLocated}
+          onViewJob={setSelected}
+          loading={results.isFetching}
+          error={results.isError}
+          onRetry={() => void results.refetch()}
+          hasMore={results.hasNextPage}
+          filters={
             <>
-              <Field label={t("minPay")} value={minPay} onChange={setMinPay} numeric />
-              <Field label={t("maxPay")} value={maxPay} onChange={setMaxPay} numeric />
+              <ScrollView horizontal>
+                <View style={s.row}>
+                  <Choice title={t("all")} selected={!category} onPress={() => setCategory("")} />
+                  {categories
+                    .filter((c) => !kind || c.kind === kind)
+                    .map((c) => (
+                      <Choice
+                        key={c.id}
+                        title={language === "ta" ? c.name_ta : c.name_en}
+                        selected={category === c.id}
+                        onPress={() => setCategory(c.id)}
+                      />
+                    ))}
+                </View>
+              </ScrollView>
+
               <View style={s.row}>
-                {["", "temporary", "full_time", "part_time", "daily_wage", "weekend", "shift"].map(
-                  (k) => (
-                    <Choice
-                      key={k}
-                      title={t(k || "all")}
-                      selected={employment === k}
-                      onPress={() => setEmployment(k)}
-                    />
-                  ),
-                )}
-              </View>
-              <View style={s.row}>
-                {["", "ta", "en"].map((k) => (
+                {["recommended", "nearest", "pay", "newest"].map((k) => (
                   <Choice
                     key={k}
-                    title={k || t("allLanguages")}
-                    selected={filterLanguage === k}
-                    onPress={() => setFilterLanguage(k)}
+                    title={t(k === "pay" ? "paySort" : k)}
+                    selected={sort === k}
+                    onPress={() => setSort(k)}
                   />
                 ))}
               </View>
-              <View style={s.row}>
-                {["", "hour", "day", "job", "month"].map((k) => (
-                  <Choice
-                    key={k}
-                    title={t(k || "allPayUnits")}
-                    selected={payUnit === k}
-                    onPress={() => setPayUnit(k)}
-                  />
-                ))}
-              </View>
+
+              {
+                <>
+                  <Field label={t("minPay")} value={minPay} onChange={setMinPay} numeric />
+                  <Field label={t("maxPay")} value={maxPay} onChange={setMaxPay} numeric />
+                  <View style={s.row}>
+                    {[
+                      "",
+                      "temporary",
+                      "full_time",
+                      "part_time",
+                      "daily_wage",
+                      "weekend",
+                      "shift",
+                    ].map((k) => (
+                      <Choice
+                        key={k}
+                        title={t(k || "all")}
+                        selected={employment === k}
+                        onPress={() => setEmployment(k)}
+                      />
+                    ))}
+                  </View>
+                  <View style={s.row}>
+                    {["", "ta", "en"].map((k) => (
+                      <Choice
+                        key={k}
+                        title={k || t("allLanguages")}
+                        selected={filterLanguage === k}
+                        onPress={() => setFilterLanguage(k)}
+                      />
+                    ))}
+                  </View>
+                  <View style={s.row}>
+                    {["", "hour", "day", "job", "month"].map((k) => (
+                      <Choice
+                        key={k}
+                        title={t(k || "allPayUnits")}
+                        selected={payUnit === k}
+                        onPress={() => setPayUnit(k)}
+                      />
+                    ))}
+                  </View>
+                </>
+              }
+              <Button
+                title={t("refresh")}
+                secondary
+                disabled={results.isFetching}
+                onPress={() => void results.refetch()}
+              />
+              <Button
+                title={t("enableNearbyAlerts")}
+                secondary
+                onPress={() =>
+                  run(async () => {
+                    await notificationService.enable();
+                    await locationService.alerts(position!.latitude, position!.longitude, true);
+                  }, "alertsSaved")
+                }
+              />
+              <Button
+                title={t("disableNearbyAlerts")}
+                secondary
+                onPress={() =>
+                  run(
+                    () => locationService.alerts(position.latitude, position.longitude, false),
+                    "alertsSaved",
+                  )
+                }
+              />
             </>
-          )}
-          <Button
-            title={t("refresh")}
-            secondary
-            disabled={results.isFetching}
-            onPress={() => void results.refetch()}
-          />
-          <Button
-            title={t("enableNearbyAlerts")}
-            secondary
-            onPress={() =>
-              run(async () => {
-                await notificationService.enable();
-                await locationService.alerts(position.latitude, position.longitude, true);
-              }, "alertsSaved")
-            }
-          />
-          <Button
-            title={t("disableNearbyAlerts")}
-            secondary
-            onPress={() =>
-              run(
-                () => locationService.alerts(position.latitude, position.longitude, false),
-                "alertsSaved",
-              )
-            }
-          />
-          <Button
-            title={t(mapView ? "listView" : "mapView")}
-            secondary
-            onPress={() => setMapView(!mapView)}
-          />
-          {mapView && (
-            <JobMap
-              position={position}
-              jobs={visibleJobs}
-              onSelect={(job) => setSelected(job)}
-              unavailable={t("mapNotConfigured")}
-              t={t}
-            />
-          )}
-          <AsyncState query={results} t={t} />
-          {!results.isPending && !results.isError && !visibleJobs.length && (
-            <Text style={s.body}>{t("empty")}</Text>
-          )}
-          {!mapView &&
-            visibleJobs.map((item) => (
-              <View key={item.job.id} style={s.card}>
-                <Text style={s.heading}>{item.job.title}</Text>
-                <Text style={s.body}>
-                  {t(item.job.kind)} · {t(item.job.employment_type)} ·{" "}
-                  {categories.find((c) => c.id === item.job.category)?.[
-                    language === "ta" ? "name_ta" : "name_en"
-                  ] || item.job.category}
-                </Text>
-                <Text style={s.body}>
-                  {Math.max(0, Math.ceil((Date.parse(item.job.expires_at) - now) / 60000))}{" "}
-                  {t("minutesLeft")} · {t("posted")}{" "}
-                  {new Date(item.job.published_at).toLocaleTimeString(
-                    language === "ta" ? "ta-IN" : "en-IN",
-                  )}
-                </Text>
-                <Text style={s.body}>
-                  {item.job.locality} · {t("approximate")} {item.distance_m / 1000} km
-                </Text>
-                <Text style={s.heading}>
-                  ₹{item.job.pay} / {t(item.job.pay_unit)}
-                </Text>
-                <Text style={s.tag}>
-                  {item.match_score}% {t("match")}
-                </Text>
-                <Button title={t("details")} secondary onPress={() => setSelected(item.job)} />
-              </View>
-            ))}
-          {results.hasNextPage && (
-            <Button
-              title={t("loadMore")}
-              disabled={results.isFetchingNextPage}
-              onPress={() => results.fetchNextPage()}
-            />
-          )}
-        </>
+          }
+          listContent={
+            <>
+              {visibleJobs.map((item) => (
+                <View key={item.job.id} style={s.card}>
+                  <Text style={s.heading}>{item.job.title}</Text>
+                  <Text style={s.body}>
+                    {t(item.job.kind)} · {t(item.job.employment_type)} ·{" "}
+                    {categories.find((c) => c.id === item.job.category)?.[
+                      language === "ta" ? "name_ta" : "name_en"
+                    ] || item.job.category}
+                  </Text>
+                  <Text style={s.body}>
+                    {Math.max(0, Math.ceil((Date.parse(item.job.expires_at) - now) / 60000))}{" "}
+                    {t("minutesLeft")} · {t("posted")}{" "}
+                    {new Date(item.job.published_at).toLocaleTimeString(
+                      language === "ta" ? "ta-IN" : "en-IN",
+                    )}
+                  </Text>
+                  <Text style={s.body}>
+                    {item.job.locality} · {t("approximate")} {item.distance_m / 1000} km
+                  </Text>
+                  <Text style={s.heading}>
+                    ₹{item.job.pay} / {t(item.job.pay_unit)}
+                  </Text>
+                  <Text style={s.tag}>
+                    {item.match_score}% {t("match")}
+                  </Text>
+                  <Button title={t("details")} secondary onPress={() => setSelected(item.job)} />
+                </View>
+              ))}
+              {results.hasNextPage && (
+                <Button
+                  title={t("loadMore")}
+                  disabled={results.isFetchingNextPage}
+                  onPress={() => results.fetchNextPage()}
+                />
+              )}
+            </>
+          }
+        />
       )}
       <Modal visible={!!selected} onRequestClose={() => setSelected(null)}>
         <SafeAreaView style={s.page}>
@@ -734,27 +902,50 @@ function Jobs({
             <Button title={t("close")} secondary onPress={() => setSelected(null)} />
             {selected && (
               <>
-                <Text style={s.title}>{selected.title}</Text>
-                <Text style={s.body}>
-                  ₹{selected.pay} / {t(selected.pay_unit)} · {t(selected.kind)} ·{" "}
-                  {selected.category}
-                </Text>
-                <Text style={s.body}>
-                  {t("approximate")}{" "}
-                  {(visibleJobs.find((j) => j.job.id === selected.id)?.distance_m || 0) / 1000} km ·{" "}
-                  {Math.max(0, Math.ceil((Date.parse(selected.expires_at) - now) / 60000))}{" "}
-                  {t("minutesLeft")}
-                </Text>
-                <Text style={s.body}>{selected.description}</Text>
-                <Text style={s.body}>
-                  {selected.schedule} · {selected.locality}
-                </Text>
-                <Text style={s.body}>{t("privacy")}</Text>
-                <Button
-                  title={t("apply")}
-                  disabled={busy}
-                  onPress={() => run(() => applicationService.apply(selected.id), "applied")}
+                <JobSummary
+                  job={selected}
+                  t={t}
+                  distance={visibleJobs.find((j) => j.job.id === selected.id)?.distance_m}
                 />
+                {confirmApply ? (
+                  <View style={s.card}>
+                    <Text style={s.heading}>{t("confirmApply")}</Text>
+                    <Text style={s.body}>{t("confirmApplyNote")}</Text>
+                    <Button
+                      title={t("submit")}
+                      disabled={busy}
+                      onPress={() => {
+                        if (applyGate.current) return;
+                        applyGate.current = true;
+                        void run(async () => {
+                          try {
+                            await applicationService.apply(selected.id);
+                            setAppliedIds((ids) => [...ids, selected.id]);
+                            setConfirmApply(false);
+                          } finally {
+                            applyGate.current = false;
+                          }
+                        }, "applied");
+                      }}
+                    />
+                    <Button
+                      title={t("cancel")}
+                      secondary
+                      disabled={busy}
+                      onPress={() => setConfirmApply(false)}
+                    />
+                  </View>
+                ) : (
+                  <Button
+                    title={t(appliedIds.includes(selected.id) ? "applied" : "apply")}
+                    disabled={
+                      busy ||
+                      appliedIds.includes(selected.id) ||
+                      Date.parse(selected.expires_at) <= now
+                    }
+                    onPress={() => setConfirmApply(true)}
+                  />
+                )}
                 <Button
                   title={t("bookmark")}
                   secondary
@@ -766,7 +957,7 @@ function Jobs({
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </>
+    </View>
   );
 }
 function AsyncState({ query, t }: { query: any; t: Translate }) {
@@ -782,6 +973,7 @@ function AsyncState({ query, t }: { query: any; t: Translate }) {
   ) : null;
 }
 function Post({
+  openCredits,
   t,
   position,
   chooseLocation,
@@ -799,6 +991,7 @@ function Post({
   busy: boolean;
   run: Run;
   onDone: () => void;
+  openCredits: () => void;
 }) {
   const [p, setP] = useState<any>({
     kind: "business",
@@ -826,9 +1019,12 @@ function Post({
         exact_address: position.formatted_address || old.exact_address,
       }));
   }, [position]);
+  const [typeChosen, setTypeChosen] = useState(false);
   const [requestId] = useState(() => Crypto.randomUUID());
   const [draft, setDraft] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
+  const [confirmPublish, setConfirmPublish] = useState(false);
+  const creditQuery = useQuery({ queryKey: creditBalanceKey, queryFn: creditService.balance });
   const update = (k: string, v: any) => setP((old: any) => ({ ...old, [k]: v }));
   const submit = (publish: boolean) => {
     const parsed = jobSchema.safeParse({
@@ -848,6 +1044,22 @@ function Post({
       onDone();
     });
   };
+  if (!typeChosen)
+    return (
+      <View style={{ gap: 20 }}>
+        <Text style={s.title}>{t("postTypeQuestion")}</Text>
+        {["residential", "business"].map((kind) => (
+          <Button
+            key={kind}
+            title={t(kind)}
+            onPress={() => {
+              update("kind", kind);
+              setTypeChosen(true);
+            }}
+          />
+        ))}
+      </View>
+    );
   return (
     <>
       <Text style={s.title}>{t("post")}</Text>
@@ -893,16 +1105,18 @@ function Post({
         ["start_date", "startDate"],
         ["benefits", "benefits"],
         ["instructions", "instructions"],
-      ].map(([key, label]) => (
-        <Field
-          key={key}
-          label={t(label)}
-          value={p[key] || ""}
-          onChange={(v) => update(key, v)}
-          numeric={["pay", "workers_required"].includes(key)}
-          multiline={["description", "instructions"].includes(key)}
-        />
-      ))}
+      ]
+        .filter(([key]) => p.kind === "business" || !["business_name", "benefits"].includes(key))
+        .map(([key, label]) => (
+          <Field
+            key={key}
+            label={t(label)}
+            value={p[key] || ""}
+            onChange={(v) => update(key, v)}
+            numeric={["pay", "workers_required"].includes(key)}
+            multiline={["description", "instructions"].includes(key)}
+          />
+        ))}
       <View style={s.row}>
         {["hour", "day", "job", "month"].map((k) => (
           <Choice
@@ -952,23 +1166,55 @@ function Post({
         secondary
         onPress={() => submit(false)}
       />
-      <Button title={t("publish")} disabled={busy || !position} onPress={() => submit(true)} />
+      <Button
+        title={t("publish")}
+        disabled={busy || !position}
+        onPress={() => setConfirmPublish(true)}
+      />
+      <PublishCost
+        balance={creditQuery.isError ? null : (creditQuery.data ?? null)}
+        t={t}
+        onOpen={openCredits}
+      />
+      {confirmPublish && (
+        <View style={{ gap: 12 }}>
+          <Text style={s.heading}>{t("jobSummary")}</Text>
+          <JobSummary job={p} t={t} />
+          <PublishConfirmation
+            balance={creditQuery.isError ? null : (creditQuery.data ?? null)}
+            t={t}
+            busy={busy}
+            onCancel={() => setConfirmPublish(false)}
+            onConfirm={() => {
+              setConfirmPublish(false);
+              submit(true);
+            }}
+          />
+        </View>
+      )}
     </>
   );
 }
 function Activity({
+  openCredits,
   t,
   run,
   busy,
   saved,
+  initialMode = "applications",
 }: {
   t: Translate;
   run: Run;
   busy: boolean;
   saved: boolean;
+  initialMode?: string;
+  openCredits: () => void;
 }) {
-  const [mode, setMode] = useState(saved ? "saved" : "applications");
+  const mode = saved ? "saved" : initialMode;
+  const [status, setStatus] = useState("");
+  useEffect(() => setStatus(""), [mode]);
   const [review, setReview] = useState<string | null>(null);
+  const [workerProfile, setWorkerProfile] = useState<string | null>(null);
   const [stars, setStars] = useState("5");
   const [body, setBody] = useState("");
   const [contact, setContact] = useState<any>(null);
@@ -980,128 +1226,181 @@ function Activity({
   });
   return (
     <>
-      <Text style={s.title}>{t(saved ? "saved" : "activity")}</Text>
-      {!saved && (
+      <Text style={s.title}>{t(routeLabel(mode))}</Text>
+      <Button title={t("refresh")} secondary onPress={() => q.refetch()} />
+      <AsyncState query={q} t={t} />
+      {mode !== "saved" && (
         <View style={s.row}>
           {[
-            ["applications", "myApplications"],
-            ["posts", "myPosts"],
-            ["applicants", "applicants"],
-          ].map(([k, l]) => (
-            <Choice key={k} title={t(l)} selected={mode === k} onPress={() => setMode(k)} />
+            "",
+            ...(mode === "posts"
+              ? ["active", "filled", "in_progress", "completed", "expired", "cancelled"]
+              : ["pending", "accepted", "rejected", "withdrawn", "completed"]),
+          ].map((k) => (
+            <Choice
+              key={k}
+              title={t(k || "all")}
+              selected={status === k}
+              onPress={() => setStatus(k)}
+            />
           ))}
         </View>
       )}
-      <Button title={t("refresh")} secondary onPress={() => q.refetch()} />
-      <AsyncState query={q} t={t} />
-      {q.data?.pages.flat().map((a) => (
-        <View key={a.id} style={s.card}>
-          <Text style={s.heading}>{a.title}</Text>
-          <Text style={s.body}>
-            {t(a.status)}
-            {a.worker_name ? ` · ${a.worker_name}` : ""}
-          </Text>
-          {mode === "applicants" && (
+      {q.isSuccess && !q.data.pages.flat().some((a) => !status || a.status === status) && (
+        <Text style={s.body}>{t("noActivity")}</Text>
+      )}
+      {q.data?.pages
+        .flat()
+        .filter((a) => !status || a.status === status)
+        .map((a) => (
+          <View key={a.id} style={s.card}>
+            <Text style={s.heading}>{a.title}</Text>
+            {a.created_at && (
+              <Text style={s.body}>
+                {new Date(a.created_at).toLocaleDateString()} · {a.locality || ""}
+              </Text>
+            )}
+            {mode === "posts" && (
+              <Text style={s.body}>
+                {t("workers")}: {a.workers_required}
+              </Text>
+            )}
+            {mode === "posts" && a.expires_at && (
+              <Text style={s.body}>
+                {Math.max(0, Math.ceil((Date.parse(a.expires_at) - Date.now()) / 60000))}{" "}
+                {t("minutesLeft")}
+              </Text>
+            )}
             <Text style={s.body}>
-              {(a.skills || []).join(", ")} · {t("experience")}: {a.experience_years}
+              {t(a.status)}
+              {mode === "applicants" && a.worker_name ? ` · ${a.worker_name}` : ""}
             </Text>
-          )}
-          {mode === "posts" ? (
-            <>
-              {a.status === "draft" && (
+            {mode === "applicants" && (
+              <Text style={s.body}>
+                {(a.skills || []).join(", ")} · {t("experience")}: {a.experience_years}
+              </Text>
+            )}
+            {mode === "applicants" && (
+              <>
                 <Button
-                  title={t("publish")}
-                  disabled={busy}
-                  onPress={() => run(() => jobService.publish(a.id))}
-                />
-              )}{" "}
-              {(a.status === "expired" ||
-                (a.status === "active" && Date.parse(a.expires_at) <= Date.now())) && (
-                <Button
-                  title={t("repost")}
-                  disabled={busy}
-                  onPress={() => run(() => jobService.repost(a.id, Crypto.randomUUID()))}
-                />
-              )}{" "}
-              {["active", "expired"].includes(a.status) && (
-                <Button
-                  title={t("filled")}
+                  title={t("viewWorkerProfile")}
                   secondary
-                  disabled={busy}
-                  onPress={() => run(() => rpc("fill_job", { p_job_id: a.id }))}
+                  onPress={() => setWorkerProfile(workerProfile === a.id ? null : a.id)}
                 />
-              )}{" "}
-              {a.status === "filled" && (
-                <Button
-                  title={t("start")}
-                  disabled={busy}
-                  onPress={() => run(() => jobService.transition(a.id, "in_progress"))}
-                />
-              )}{" "}
-              {["draft", "active", "filled"].includes(a.status) && (
-                <Button
-                  title={t("cancel")}
-                  disabled={busy}
-                  secondary
-                  onPress={() => run(() => jobService.transition(a.id, "cancelled"))}
-                />
-              )}
-            </>
-          ) : mode === "saved" ? (
-            <Button
-              title={t("apply")}
-              disabled={busy}
-              onPress={() => run(() => applicationService.apply(a.id), "applied")}
-            />
-          ) : (
-            <>
-              {mode === "applications" && ["pending", "shortlisted"].includes(a.status) && (
-                <Button
-                  title={t("withdraw")}
-                  secondary
-                  disabled={busy}
-                  onPress={() => run(() => applicationService.decide(a.id, "withdrawn"))}
-                />
-              )}{" "}
-              {mode === "applicants" && ["pending", "shortlisted"].includes(a.status) && (
-                <View style={s.row}>
-                  {["accepted", "rejected", "shortlisted"].map((k, i) => (
-                    <Button
-                      key={k}
-                      title={t(["accept", "reject", "shortlist"][i])}
-                      disabled={busy}
-                      secondary={i > 0}
-                      onPress={() => run(() => applicationService.decide(a.id, k))}
-                    />
-                  ))}
-                </View>
-              )}
-              {["accepted", "completed"].includes(a.status) && (
-                <Button
-                  title={t("contact")}
-                  secondary
-                  onPress={() =>
-                    run(async () => setContact(await applicationService.contact(a.id)), "")
-                  }
-                />
-              )}{" "}
-              {a.status === "accepted" && a.job_status === "in_progress" && (
-                <>
-                  <Text style={s.body}>{t("completionNote")}</Text>
-                  <Button
-                    title={t("complete")}
-                    disabled={busy}
-                    onPress={() => run(() => applicationService.complete(a.id))}
+                {workerProfile === a.id && (
+                  <View style={s.card}>
+                    <Text style={s.heading}>{a.worker_name}</Text>
+                    {a.rating != null && <Text style={s.body}>★ {a.rating}</Text>}
+                    <Text style={s.body}>{(a.skills || []).join(" · ")}</Text>
+                    <Text style={s.body}>
+                      {t("experience")}: {a.experience_years ?? t("notShared")}
+                    </Text>
+                    <Text style={s.body}>{t("workerPrivacy")}</Text>
+                  </View>
+                )}
+              </>
+            )}
+            {mode === "posts" ? (
+              <>
+                {a.status === "draft" && (
+                  <LivePublishAction
+                    job={a}
+                    openCredits={openCredits}
+                    t={t}
+                    busy={busy}
+                    onConfirm={() => run(() => jobService.publish(a.id))}
                   />
-                </>
-              )}
-              {a.status === "completed" && (
-                <Button title={t("review")} secondary onPress={() => setReview(a.id)} />
-              )}
-            </>
-          )}
-        </View>
-      ))}
+                )}{" "}
+                {(a.status === "expired" ||
+                  (a.status === "active" && Date.parse(a.expires_at) <= Date.now())) && (
+                  <LivePublishAction
+                    job={a}
+                    openCredits={openCredits}
+                    t={t}
+                    busy={busy}
+                    repost
+                    onConfirm={() => run(() => jobService.repost(a.id, Crypto.randomUUID()))}
+                  />
+                )}{" "}
+                {a.status === "active" && Date.parse(a.expires_at) > Date.now() && (
+                  <Button
+                    title={t("filled")}
+                    secondary
+                    disabled={busy}
+                    onPress={() => run(() => rpc("fill_job", { p_job_id: a.id }))}
+                  />
+                )}{" "}
+                {a.status === "filled" && (
+                  <Button
+                    title={t("start")}
+                    disabled={busy}
+                    onPress={() => run(() => jobService.transition(a.id, "in_progress"))}
+                  />
+                )}{" "}
+                {["draft", "active", "filled"].includes(a.status) && (
+                  <Button
+                    title={t("cancel")}
+                    disabled={busy}
+                    secondary
+                    onPress={() => run(() => jobService.transition(a.id, "cancelled"))}
+                  />
+                )}
+              </>
+            ) : mode === "saved" ? (
+              <Button
+                title={t("apply")}
+                disabled={busy}
+                onPress={() => run(() => applicationService.apply(a.id), "applied")}
+              />
+            ) : (
+              <>
+                {mode === "applications" && ["pending", "shortlisted"].includes(a.status) && (
+                  <Button
+                    title={t("withdraw")}
+                    secondary
+                    disabled={busy}
+                    onPress={() => run(() => applicationService.decide(a.id, "withdrawn"))}
+                  />
+                )}{" "}
+                {mode === "applicants" && ["pending", "shortlisted"].includes(a.status) && (
+                  <View style={s.row}>
+                    {["accepted", "rejected", "shortlisted"].map((k, i) => (
+                      <Button
+                        key={k}
+                        title={t(["accept", "reject", "shortlist"][i])}
+                        disabled={busy}
+                        secondary={i > 0}
+                        onPress={() => run(() => applicationService.decide(a.id, k))}
+                      />
+                    ))}
+                  </View>
+                )}
+                {["accepted", "completed"].includes(a.status) && (
+                  <Button
+                    title={t("contact")}
+                    secondary
+                    onPress={() =>
+                      run(async () => setContact(await applicationService.contact(a.id)), "")
+                    }
+                  />
+                )}{" "}
+                {a.status === "accepted" && a.job_status === "in_progress" && (
+                  <>
+                    <Text style={s.body}>{t("completionNote")}</Text>
+                    <Button
+                      title={t("complete")}
+                      disabled={busy}
+                      onPress={() => run(() => applicationService.complete(a.id))}
+                    />
+                  </>
+                )}
+                {a.status === "completed" && (
+                  <Button title={t("review")} secondary onPress={() => setReview(a.id)} />
+                )}
+              </>
+            )}
+          </View>
+        ))}
       {q.hasNextPage && (
         <Button
           title={t("loadMore")}
@@ -1233,6 +1532,25 @@ function Preferences({
   return (
     <>
       <Text style={s.title}>{t("preferences")}</Text>
+      <View style={s.card}>
+        <Text style={s.heading}>{t("discoverableForHire")}</Text>
+        <Text style={s.body}>{t("discoveryConsent")}</Text>
+        <Text style={s.body}>{t(p.discoverable_for_hire ? "yes" : "no")}</Text>
+        <Button
+          title={t(p.discoverable_for_hire ? "disableDiscovery" : "enableDiscovery")}
+          disabled={busy}
+          onPress={() =>
+            run(async () => {
+              const point = p.discoverable_for_hire ? null : await locationService.gps();
+              await rpc("set_worker_discovery", {
+                p_enabled: !p.discoverable_for_hire,
+                p_lat: point?.latitude ?? null,
+                p_lng: point?.longitude ?? null,
+              });
+            })
+          }
+        />
+      </View>
       <View style={s.row}>
         {categories.map((c) => (
           <Choice
@@ -1269,16 +1587,7 @@ function Preferences({
           numeric={k !== "available_time"}
         />
       ))}
-      <View style={s.row}>
-        {[1000, 3000, 5000].map((r) => (
-          <Choice
-            key={r}
-            title={`${r / 1000} km`}
-            selected={p.radius_m === r}
-            onPress={() => update("radius_m", r)}
-          />
-        ))}
-      </View>
+      <DistanceControl metres={p.radius_m} onChange={(r) => update("radius_m", r)} t={t} />
       <Text style={s.label}>{t("availability")}</Text>
       <View style={s.row}>
         {[true, false].map((v) => (
@@ -1319,6 +1628,9 @@ function Updates({ t, run }: { t: Translate; run: Run }) {
     <>
       <Text style={s.title}>{t("notifications")}</Text>
       <AsyncState query={q} t={t} />
+      {q.isSuccess && !q.data.pages.flat().length && (
+        <Text style={s.body}>{t("noNotificationsHint")}</Text>
+      )}
       {q.data?.pages.flat().map((n) => (
         <View key={n.id} style={s.card}>
           <Text style={s.body}>
@@ -1340,50 +1652,175 @@ function Updates({ t, run }: { t: Translate; run: Run }) {
 }
 function Credits({ t }: { t: Translate }) {
   const busyRef = useRef(false);
-  const q = useQuery({ queryKey: ["credits"], queryFn: creditService.balance });
-  const packs = useQuery({ queryKey: ["creditPackages"], queryFn: creditService.packages });
+  const [selected, setSelected] = useState("");
+  const [state, setState] = useState("");
+  const [providerOrder, setProviderOrder] = useState("");
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState("");
-  const [request, setRequest] = useState<{ pack: string; id: string } | null>(null);
-  const buy = async (pack: string) => {
-    if (busyRef.current) return;
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: creditBalanceKey,
+    queryFn: creditService.balance,
+    refetchInterval: 15000,
+  });
+  const ledger = useInfiniteQuery({
+    queryKey: ["creditHistory"],
+    queryFn: ({ pageParam }) => creditService.history(pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (last, all) => (last.length === 30 ? all.length * 30 : undefined),
+    refetchInterval: 15000,
+  });
+  const packs = useQuery({ queryKey: ["creditPackages"], queryFn: creditService.packages });
+  const config = useQuery({
+    queryKey: ["paymentConfig"],
+    queryFn: async () => {
+      const { data, error } = await db!
+        .from("payment_config")
+        .select("payments_enabled_test")
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const refresh = async () => {
+    await qc.invalidateQueries({ queryKey: creditBalanceKey });
+    await qc.invalidateQueries({ queryKey: ["creditHistory"] });
+  };
+  useEffect(() => {
+    if (!providerOrder || state !== "paymentVerifying") return;
+    let alive = true;
+    const timer = setInterval(() => {
+      void db!
+        .from("payment_orders")
+        .select("status")
+        .eq("provider_order_id", providerOrder)
+        .single()
+        .then(({ data }) => {
+          if (alive && data?.status === "paid") {
+            setState("paymentSuccess");
+            void qc.invalidateQueries({ queryKey: creditBalanceKey });
+            void qc.invalidateQueries({ queryKey: ["creditHistory"] });
+          }
+        });
+    }, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [providerOrder, state, qc]);
+  const buy = async () => {
+    if (busyRef.current || !selected) return;
+    if (Platform.OS === "web") {
+      setState("nativePaymentRequired");
+      return;
+    }
     busyRef.current = true;
     setBusy(true);
-    setNote("");
-    const requestId = request?.pack === pack ? request.id : Crypto.randomUUID();
-    setRequest({ pack, id: requestId });
+    setState("creatingOrder");
     try {
-      const order = await edge("payment-order", { package_id: pack, request_id: requestId });
-      await openCheckout(order);
-      setNote("paymentVerifying");
-      setRequest(null);
-      await q.refetch();
-    } catch {
-      setNote("paymentPending");
+      const {
+        data: { user },
+      } = await db!.auth.getUser();
+      if (!user) throw new Error("AUTH_REQUIRED");
+      const key = `nearhire.payment.${user.id}.${selected}`;
+      let requestId = await AsyncStorage.getItem(key);
+      if (!requestId) {
+        requestId = Crypto.randomUUID();
+        await AsyncStorage.setItem(key, requestId);
+      }
+      const order = await edge("payment-order", { package_id: selected, request_id: requestId });
+      if (order.status === "paid") {
+        await AsyncStorage.removeItem(key);
+        await refresh();
+        setState("paymentSuccess");
+        return;
+      }
+      setProviderOrder(order.order_id);
+      setState("openingCheckout");
+      const result = await openCheckout(order);
+      setState("paymentVerifying");
+      const verified = await edge("payment-verify", { ...result });
+      if (verified.status === "paid") {
+        await AsyncStorage.removeItem(key);
+        setState("paymentSuccess");
+      } else setState("paymentVerifying");
+      await refresh();
+    } catch (e) {
+      const error = e as { code?: number; message?: string };
+      setState(error.code === 2 ? "paymentCancelled" : "paymentFailed");
+      await refresh();
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
   };
   return (
-    <View style={s.card}>
-      <Text style={s.heading}>
-        {t("credits")}: {q.data ?? "—"}
-      </Text>
-      <Button title={t("refresh")} secondary onPress={() => q.refetch()} />
-      {note && (
-        <Text accessibilityLiveRegion="polite" style={s.body}>
-          {t(note)}
+    <View style={{ gap: 16 }}>
+      <Text style={s.title}>{t("profileCredits")}</Text>
+      <JobCreditBalance balance={q.isError ? null : (q.data ?? null)} t={t} />
+      <Button title={t("refresh")} secondary onPress={() => void refresh()} />
+      <Text style={s.heading}>{t("buyJobCredits")}</Text>
+      <Text style={s.body}>{t("paymentTestOnly")}</Text>
+      <AsyncState query={packs} t={t} />
+      {packs.data && (
+        <PaymentPackages
+          packages={packs.data}
+          selected={selected}
+          onSelect={setSelected}
+          t={t}
+          disabled={busy}
+        />
+      )}
+      {(config.isError || config.data?.payments_enabled_test !== true) && (
+        <Text style={s.body}>{t("paymentUnavailable")}</Text>
+      )}
+      <Button
+        title={t("continuePayment")}
+        disabled={busy || !selected || config.data?.payments_enabled_test !== true}
+        onPress={() => void buy()}
+      />
+      {!!state && (
+        <Text accessibilityLiveRegion="polite" style={s.notice}>
+          {t(state)}
         </Text>
       )}
-      {packs.data?.map((p) => (
-        <Button
-          key={p.id}
-          title={`${t("buyCredits")} · ${p.credits} · ₹${p.amount_paise / 100}`}
-          disabled={busy}
-          onPress={() => buy(p.id)}
-        />
+      {config.isError && (
+        <Button title={t("retry")} secondary onPress={() => void config.refetch()} />
+      )}
+      <Text style={s.heading}>{t("creditHistory")}</Text>
+      <AsyncState query={ledger} t={t} />
+      {ledger.data?.pages.flat().map((entry) => (
+        <View key={entry.id} style={s.card}>
+          <Text style={s.heading}>
+            {entry.delta > 0 ? "+" : ""}
+            {entry.delta}
+          </Text>
+          <Text style={s.body}>
+            {t(
+              entry.reason === "signup"
+                ? "creditSignup"
+                : entry.reason === "purchase"
+                  ? "creditPurchase"
+                  : entry.reason === "repost"
+                    ? "creditRepost"
+                    : entry.reason === "publish"
+                      ? "creditPublish"
+                      : "creditOther",
+            )}
+          </Text>
+          {entry.metadata?.title && <Text style={s.body}>{entry.metadata.title}</Text>}
+          {entry.metadata?.amount_paise && (
+            <Text style={s.body}>₹{entry.metadata.amount_paise / 100}</Text>
+          )}
+          <Text style={s.body}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+        </View>
       ))}
+      {ledger.hasNextPage && (
+        <Button
+          title={t("loadMore")}
+          disabled={ledger.isFetchingNextPage}
+          onPress={() => void ledger.fetchNextPage()}
+        />
+      )}
     </View>
   );
 }
@@ -1403,6 +1840,62 @@ function DeleteAccount({ t, busy, run }: { t: Translate; busy: boolean; run: Run
             onPress={() => run(authService.remove, "")}
           />
         </View>
+      )}
+    </>
+  );
+}
+
+function LiveCreditChip({ t, onOpen }: { t: Translate; onOpen: () => void }) {
+  const q = useQuery({ queryKey: creditBalanceKey, queryFn: creditService.balance });
+  return <CreditBalanceChip balance={q.isError ? null : (q.data ?? null)} t={t} onPress={onOpen} />;
+}
+
+function LivePublishAction({
+  job,
+  openCredits,
+  t,
+  busy,
+  repost = false,
+  onConfirm,
+}: {
+  t: Translate;
+  busy: boolean;
+  repost?: boolean;
+  job?: any;
+  openCredits: () => void;
+  onConfirm: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const q = useQuery({ queryKey: creditBalanceKey, queryFn: creditService.balance });
+  return (
+    <>
+      <Button
+        title={t(repost ? "repost" : "publish")}
+        disabled={busy}
+        onPress={() => setOpen(true)}
+      />
+      {open && (
+        <>
+          {job && (
+            <>
+              <Text style={s.heading}>{t("jobSummary")}</Text>
+              <JobSummary job={job} t={t} />
+            </>
+          )}
+          {repost && <Text style={s.body}>{t("reviewRepost")}</Text>}
+          <PublishConfirmation
+            balance={q.isError ? null : (q.data ?? null)}
+            t={t}
+            busy={busy}
+            onCancel={() => setOpen(false)}
+            onConfirm={() => {
+              setOpen(false);
+              onConfirm();
+            }}
+          />
+          {q.isError && <Button title={t("retry")} secondary onPress={() => void q.refetch()} />}
+          {q.data === 0 && <Button title={t("goJobCredits")} secondary onPress={openCredits} />}
+        </>
       )}
     </>
   );

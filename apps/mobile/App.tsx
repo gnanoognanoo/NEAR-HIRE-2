@@ -1,18 +1,17 @@
-import React from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import LiveApp from "./src/live/LiveApp";
-import PreviewApp from "./PreviewApp";
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 15000 }, mutations: { retry: false } },
-});
+import React, { lazy, Suspense } from "react";
+import { ActivityIndicator } from "react-native";
+// DEV gallery never imports the live client or creates an authenticated session.
+// Release exports disable this branch regardless of environment flags.
+const Root =
+  __DEV__ && process.env.EXPO_PUBLIC_UI_PREVIEW === "true"
+    ? lazy(() => import("./src/dev/WorkspacePreview"))
+    : __DEV__ && process.env.EXPO_PUBLIC_DEMO_MODE === "true"
+      ? lazy(() => import("./PreviewApp"))
+      : lazy(() => import("./ProductionApp"));
 export default function App() {
-  if (__DEV__ && process.env.EXPO_PUBLIC_DEMO_MODE === "true") return <PreviewApp />;
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <LiveApp />
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <Suspense fallback={<ActivityIndicator />}>
+      <Root />
+    </Suspense>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, ScrollView, Text, View } from "react-native";
 import { Button, Field, styles as s, colors } from "./ui";
 import { locationService, type Place } from "./services";
 import { coordinates, locationErrorKey, type Position } from "./location-logic";
@@ -13,6 +13,8 @@ export default function LocationPicker({
   onSelect: (p: Position) => void;
   initial?: Position | null;
 }) {
+  const [sheet, setSheet] = useState(false);
+  const [diagnostics, setDiagnostics] = useState(false);
   const [query, setQuery] = useState("");
   const [places, setPlaces] = useState<Place[]>([]);
   const [point, setPoint] = useState<Position | null>(initial || null);
@@ -95,90 +97,151 @@ export default function LocationPicker({
     }
   }
   return (
-    <>
-      <Text style={s.title}>{t("permissionTitle")}</Text>
-      <Text style={s.body}>{t("locationExplain")}</Text>
-      <Button title={t("gps")} disabled={busy} onPress={() => void gps()} />
-      {error === "locationPermanent" && (
-        <Button title={t("openSettings")} secondary onPress={() => void Linking.openSettings()} />
-      )}
-      <Field label={t("manual")} value={query} onChange={setQuery} />
-      {(busy || searching) && (
-        <>
-          <ActivityIndicator color={colors.accent} />
-          <Text style={s.body}>{t("locationLoading")}</Text>
-        </>
-      )}
-      {!!error && (
-        <>
-          <Text accessibilityRole="alert" style={s.body}>
-            {t(error)}
-          </Text>
-          <Button
-            title={t("retry")}
-            secondary
-            disabled={busy || searching}
-            onPress={() => {
-              if (query.length >= 3) setRetry((v) => v + 1);
-              else if (point) void select(point);
-              else void gps();
-            }}
-          />
-        </>
-      )}
-      {searched && !searching && !places.length && <Text style={s.body}>{t("noPlaces")}</Text>}
-      {places.map((p) => (
-        <Button
-          key={p.id}
-          title={p.label}
-          secondary
-          disabled={busy}
-          onPress={() => {
-            setBusy(true);
-            locationService
-              .resolve(p.id)
-              .then((place) =>
-                select({ ...place, ...coordinates(place.latitude, place.longitude) }, false),
-              )
-              .catch((e) => setError(locationErrorKey(e)))
-              .finally(() => setBusy(false));
-          }}
-        />
-      ))}
-      <Text style={s.body}>{t("manualCoordinates")}</Text>
-      <View style={s.row}>
-        <Field label={t("latitude")} value={lat} onChange={setLat} />
-        <Field label={t("longitude")} value={lng} onChange={setLng} />
+    <View style={{ flex: 1, minHeight: 0 }}>
+      <LocationPin
+        fill
+        zoom={point ? 15 : 4}
+        position={point || { latitude: 20.5937, longitude: 78.9629 }}
+        onMove={(p) => void select(p)}
+        t={t}
+      />
+      <View
+        style={{
+          position: "absolute",
+          top: 10,
+          left: 10,
+          right: 10,
+          backgroundColor: "white",
+          borderRadius: 14,
+          padding: 12,
+          maxHeight: "45%",
+        }}
+      >
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
+          {" "}
+          {error === "locationPermanent" && (
+            <Button
+              title={t("openSettings")}
+              secondary
+              onPress={() => void Linking.openSettings()}
+            />
+          )}
+          <Field label={t("manual")} value={query} onChange={setQuery} />
+          {(busy || searching) && (
+            <>
+              <ActivityIndicator color={colors.accent} />
+              <Text style={s.body}>{t("locationLoading")}</Text>
+            </>
+          )}
+          {!!error && (
+            <>
+              <Text accessibilityRole="alert" style={s.body}>
+                {t(error)}
+              </Text>
+              <Button
+                title={t("retry")}
+                secondary
+                disabled={busy || searching}
+                onPress={() => {
+                  if (query.length >= 3) setRetry((v) => v + 1);
+                  else if (point) void select(point);
+                  else void gps();
+                }}
+              />
+            </>
+          )}
+          {searched && !searching && !places.length && <Text style={s.body}>{t("noPlaces")}</Text>}
+          {places.map((p) => (
+            <Button
+              key={p.id}
+              title={p.label}
+              secondary
+              disabled={busy}
+              onPress={() => {
+                setBusy(true);
+                locationService
+                  .resolve(p.id)
+                  .then((place) =>
+                    select({ ...place, ...coordinates(place.latitude, place.longitude) }, false),
+                  )
+                  .catch((e) => setError(locationErrorKey(e)))
+                  .finally(() => setBusy(false));
+              }}
+            />
+          ))}
+          <Button title={t("gps")} disabled={busy} onPress={() => void gps()} />
+        </ScrollView>
       </View>
-      <Button
-        title={t("useCoordinates")}
-        secondary
-        disabled={busy}
-        onPress={() => {
-          try {
-            void select(coordinates(lat, lng));
-          } catch (e) {
-            setError(locationErrorKey(e));
-          }
+      <View
+        style={{
+          position: "absolute",
+          bottom: 34,
+          left: 10,
+          right: 10,
+          backgroundColor: "white",
+          padding: 12,
+          borderRadius: 14,
+          gap: 8,
         }}
-      />
-      {point && <LocationPin position={point} onMove={(p) => void select(p)} t={t} />}
-      <Field label={t("locality")} value={locality} onChange={setLocality} />
-      <Field label={t("privateAddress")} value={address} onChange={setAddress} />
-      <Text style={s.body}>{t("privateLocationNote")}</Text>
-      <Button
-        title={t("confirmLocation")}
-        disabled={!point || busy || locality.trim().length < 2}
-        onPress={() => {
-          if (point)
-            onSelect({
-              ...point,
-              locality: locality.trim(),
-              formatted_address: address.trim(),
-              label: locality.trim(),
-            });
-        }}
-      />
-    </>
+      >
+        <Text style={s.body}>{t("movePin")}</Text>
+        <Button title={t("confirmLocation")} disabled={!point} onPress={() => setSheet(true)} />
+      </View>
+      <Modal visible={sheet} transparent onRequestClose={() => setSheet(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.2)" }}>
+          <ScrollView
+            style={{ maxHeight: "85%", backgroundColor: "white" }}
+            contentContainerStyle={s.content}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Button title={t("close")} secondary onPress={() => setSheet(false)} />{" "}
+            {__DEV__ && (
+              <Button
+                title={t("developerInfo")}
+                secondary
+                onPress={() => setDiagnostics(!diagnostics)}
+              />
+            )}
+            {__DEV__ && diagnostics && (
+              <>
+                <Text style={s.body}>{t("manualCoordinates")}</Text>
+                <View style={s.row}>
+                  <Field label={t("latitude")} value={lat} onChange={setLat} />
+                  <Field label={t("longitude")} value={lng} onChange={setLng} />
+                </View>
+                <Button
+                  title={t("useCoordinates")}
+                  secondary
+                  disabled={busy}
+                  onPress={() => {
+                    try {
+                      void select(coordinates(lat, lng));
+                    } catch (e) {
+                      setError(locationErrorKey(e));
+                    }
+                  }}
+                />
+              </>
+            )}
+            <Field label={t("locality")} value={locality} onChange={setLocality} />
+            <Field label={t("privateAddress")} value={address} onChange={setAddress} />
+            <Text style={s.body}>{t("privateLocationNote")}</Text>
+            <Button
+              title={t("confirmLocation")}
+              disabled={!point || busy || locality.trim().length < 2}
+              onPress={() => {
+                if (point)
+                  onSelect({
+                    ...point,
+                    locality: locality.trim(),
+                    formatted_address: address.trim(),
+                    label: locality.trim(),
+                  });
+              }}
+            />
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
   );
 }

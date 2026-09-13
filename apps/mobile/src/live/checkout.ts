@@ -5,7 +5,7 @@ export async function openCheckout(order: {
   amount: number;
   currency: string;
 }) {
-  await RazorpayCheckout.open({
+  return RazorpayCheckout.open({
     key: order.key_id,
     order_id: order.order_id,
     amount: order.amount,

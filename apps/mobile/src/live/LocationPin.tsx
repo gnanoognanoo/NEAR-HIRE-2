@@ -4,11 +4,13 @@ import { Map, Camera, ViewAnnotation } from "@maplibre/maplibre-react-native";
 import { configuredMapProvider, type Position } from "./location-logic";
 import { Button, styles as s, colors } from "./ui";
 export type PinProps = {
+  fill?: boolean;
   position: Position;
+  zoom?: number;
   onMove: (p: Position) => void;
   t: (key: string) => string;
 };
-export default function LocationPin({ position, onMove, t }: PinProps) {
+export default function LocationPin({ position, onMove, t, zoom = 15, fill = false }: PinProps) {
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
   const style = configuredMapProvider().styleURL;
@@ -29,7 +31,7 @@ export default function LocationPin({ position, onMove, t }: PinProps) {
           />
         </>
       )}
-      <View style={{ height: 320 }}>
+      <View style={fill ? { flex: 1 } : { height: 320 }}>
         <Map
           key={version}
           style={{ flex: 1 }}
@@ -39,7 +41,7 @@ export default function LocationPin({ position, onMove, t }: PinProps) {
             onMove({ longitude: e.nativeEvent.lngLat[0], latitude: e.nativeEvent.lngLat[1] })
           }
         >
-          <Camera center={[position.longitude, position.latitude]} zoom={15} />
+          <Camera center={[position.longitude, position.latitude]} zoom={zoom} />
           <ViewAnnotation
             id="work-pin"
             lngLat={[position.longitude, position.latitude]}
@@ -63,7 +65,7 @@ export default function LocationPin({ position, onMove, t }: PinProps) {
           </ViewAnnotation>
         </Map>
       </View>
-      <Text style={s.body}>{t("movePin")}</Text>
+      {!fill && <Text style={s.body}>{t("movePin")}</Text>}
     </>
   );
 }

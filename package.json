@@ -6,7 +6,7 @@
     "test": "npm --prefix apps/mobile test && node --test tests/localization.mjs",
     "build": "npm --prefix apps/mobile run build:web && npm --prefix apps/admin run build",
     "format": "prettier --write .",
-    "lint": "eslint apps/mobile/src/live apps/mobile/App.tsx apps/admin/app packages --max-warnings 0",
+    "lint": "eslint apps/mobile/src/live apps/mobile/src/dev apps/mobile/App.tsx apps/mobile/ProductionApp.tsx apps/admin/app packages --max-warnings 0",
     "test:db": "node tests/database.mjs"
   },
   "devDependencies": {

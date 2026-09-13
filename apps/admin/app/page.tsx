@@ -15,7 +15,16 @@ const fields: Record<string, string[]> = {
   profiles: ["name", "locality", "city", "suspended", "verified"],
   jobs: ["title", "kind", "locality", "pay", "status"],
   reports: ["reason", "detail", "status", "created_at"],
-  payment_orders: ["amount_paise", "credits", "status", "created_at"],
+  payment_orders: [
+    "user_id",
+    "package_id",
+    "amount_paise",
+    "credits",
+    "provider_order_id",
+    "provider_payment_id",
+    "status",
+    "created_at",
+  ],
   credit_transactions: ["delta", "reason", "created_at"],
   admin_actions: ["action", "reason", "created_at"],
 };
