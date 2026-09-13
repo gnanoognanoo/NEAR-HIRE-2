@@ -30,17 +30,39 @@ Native UI distinguishes order creation, checkout, verification, success, cancell
 
 ## Credentials and hosted setup
 
-Razorpay credentials were absent from the process, known external secrets folder and hosted secret-name listing during this task. **RAZORPAY TEST CREDENTIALS REQUIRED.** Do not claim real checkout, delivery or capture passed. No live money is enabled.
+Verified on 13 September 2026: the external `C:\PROJECTS\NEARHIRE-SECRETS\razorpay-test.env` contains the three required credentials, and the API key ID is TEST-only. The three Edge secrets and `PAYMENTS_ENABLED=true` are configured in Supabase project `mxsltkyebhboaglbspse`. Hosted `payment_config` confirms `payments_enabled_test=true` and `live_enabled=false`. No credentials were copied into the repository. Real checkout, payment capture and provider-originated webhook delivery remain untested.
 
 1. Sign in to Razorpay Dashboard and select **Test Mode**. Generate test API keys under **Account & Settings → API Keys** (dashboard navigation may be called Developers). Save the key ID and secret in an external file, e.g. `C:\PROJECTS\NEARHIRE-SECRETS\razorpay-test.env`. Do not commit it or paste secrets into chat/source.
 2. That external file must define `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` and `PAYMENTS_ENABLED=true`. The API ID must be a test ID. Set a separate random webhook secret; it is not the API secret. No Razorpay secrets belong in `EXPO_PUBLIC_*`.
 3. Configure Edge secrets with `npx supabase secrets set --project-ref mxsltkyebhboaglbspse --env-file C:\PROJECTS\NEARHIRE-SECRETS\razorpay-test.env`. Do not print file contents or CLI debug logs. Keep `payment_config.payments_enabled_test=true` and `live_enabled=false`.
 4. Deploy `payment-order`, `payment-verify`, `razorpay-webhook` with `npx supabase functions deploy FUNCTION --project-ref mxsltkyebhboaglbspse`. JWT gateway verification is disabled in function config because order/verify perform explicit user authentication and webhook performs its own HMAC authentication.
-5. In Razorpay Test Mode **Developers → Webhooks**, add `https://mxsltkyebhboaglbspse.supabase.co/functions/v1/razorpay-webhook`. Enter the same external webhook secret. Subscribe to `payment.captured`, `order.paid`, `payment.failed`, `refund.processed`. Enable the webhook.
+5. In Razorpay Test Mode **Account & Settings → Webhooks**, inspect the existing endpoint `https://mxsltkyebhboaglbspse.supabase.co/functions/v1/razorpay-webhook`; do not create a duplicate. The existing endpoint is enabled and has a secret configured. Its existing three subscriptions were preserved and `refund.processed` was added; the dashboard confirms all four events: `payment.captured`, `order.paid`, `payment.failed`, `refund.processed`. The existing secret was not changed. A real Razorpay delivery is still required to confirm its secret matches the hosted value.
 6. Configure automatic capture in **Account & Settings → Payment Capture**. Authorization alone earns no credits. Use Razorpay's current official test instruments, not real card/payment details.
 7. Inspect function logs for safe event/status IDs. Never log request bodies, signatures, full provider payloads, card data or key secrets.
 
 ## Required native test checkout
+
+### Configuration verification results — 13 September 2026
+
+| Check | Result |
+|---|---|
+| Hosted active package catalog | PASS: 1/900, 5/3900, 10/6900, all INR |
+| Provider TEST order: 1 credit / ₹9 | HTTP 200, `order_TbXPvfcCAf21lW`, 900 paise, created |
+| Provider TEST order: 5 credits / ₹39 | HTTP 200, `order_TbXPvzUcPIRfCY`, 3900 paise, created |
+| Provider TEST order: 10 credits / ₹69 | HTTP 200, `order_TbXPw8gAMo8TbA`, 6900 paise, created |
+| Unauthenticated order and verification endpoints | Both HTTP 401 `AUTH_REQUIRED` |
+| Hosted webhook invalid signature | HTTP 401 `INVALID_SIGNATURE` |
+| Hosted webhook valid HMAC over an ignored configuration event | HTTP 200, received; no settlement attempted |
+| Existing Razorpay TEST webhook | One endpoint, enabled, four handled events, secret configured |
+| Authenticated internal purchase / actual checkout | AUTH BLOCKED / NOT RUN: no authenticated NearHire test-user session; native build paused |
+| Actual capture, client checkout signature, provider delivery/replay | NOT RUN |
+| Hosted purchase award, purchase-then-publish, recovery, admin payment record | NOT RUN |
+
+The three orders above are provider-level configuration probes, not internal NearHire purchase orders. Hosted queries confirm zero internal rows for those provider IDs, zero payments and zero payment events at verification time. No credits were awarded and no money was captured. The signed ignored-event probe confirms the deployed HMAC path with the supplied secret, but does not prove Razorpay delivery or dashboard-secret equality. SQL idempotency tests and signature unit tests do not substitute for real checkout or duplicate delivery testing.
+
+Repository validation passed: mobile/admin TypeScript, ESLint, 23 mobile/unit tests, 2 localization tests, 40 database/PostGIS scenarios, six Edge Function type checks, three Edge security tests, admin production build, mobile web export, and all seven browser preview checks. The GPS regression initially failed because it invoked a stale mock callback before the asynchronous permission check registered the next request. The test now waits for each request registration before supplying its result; the rerun passed without changing app behavior. The payment preview verifies package amounts/savings, selection, unchanged fixture balance, no backend payment requests, and no horizontal overflow at 360/390/412px. The development preview is `http://localhost:8093` (Profile → Credits); it does not perform checkout.
+
+The capture settings page could not yet be inspected: automatic approval review blocked its navigation control as potentially changing payment configuration. Capture settings were not changed. Confirm the provider's TEST automatic-capture setting before native checkout. No payment delivery/replay tooling was exposed in the inspected webhook details view; use an actual test checkout and its resulting delivery record for the outstanding end-to-end checks.
 
 APK build is paused until explicit owner approval. Web preview only displays payment UI; selecting a package and continuing does not create a Razorpay order or add credits.
 
