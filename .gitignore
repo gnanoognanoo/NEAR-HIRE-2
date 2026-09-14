@@ -25,6 +25,7 @@ GoogleService-Info.plist
 *service_account*.json
 *firebase-adminsdk*.json
 credentials.json
+payment-test-user.env
 secrets/
 .envrc
 # Generated output and local caches

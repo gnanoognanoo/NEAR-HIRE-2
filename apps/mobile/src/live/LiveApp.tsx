@@ -64,6 +64,9 @@ import en from "./locales/en.json";
 import ta from "./locales/ta.json";
 import { jobSchema } from "../../../../packages/core/validation";
 type Lang = "en" | "ta";
+const PaymentTestLogin = __DEV__ && process.env.EXPO_PUBLIC_PAYMENT_TEST_AUTH === "true"
+  ? React.lazy(() => import("../dev/PaymentTestLogin"))
+  : null;
 type Translate = (key: string) => string;
 
 type Run = (fn: () => Promise<unknown>, success?: string) => Promise<void>;
@@ -281,7 +284,10 @@ export default function LiveApp() {
       <Text style={s.body}>{t("setupBody")}</Text>
     </>
   ) : !session ? (
-    <PhoneAuth t={t} onVerified={() => setMessage("otpSuccess")} />
+    <>
+      <PhoneAuth t={t} onVerified={() => setMessage("otpSuccess")} />
+      {PaymentTestLogin && <React.Suspense fallback={<ActivityIndicator />}><PaymentTestLogin /></React.Suspense>}
+    </>
   ) : profile.isPending ? (
     <ActivityIndicator color={colors.accent} />
   ) : profile.isError ? (

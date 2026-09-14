@@ -62,7 +62,53 @@ The three orders above are provider-level configuration probes, not internal Nea
 
 Repository validation passed: mobile/admin TypeScript, ESLint, 23 mobile/unit tests, 2 localization tests, 40 database/PostGIS scenarios, six Edge Function type checks, three Edge security tests, admin production build, mobile web export, and all seven browser preview checks. The GPS regression initially failed because it invoked a stale mock callback before the asynchronous permission check registered the next request. The test now waits for each request registration before supplying its result; the rerun passed without changing app behavior. The payment preview verifies package amounts/savings, selection, unchanged fixture balance, no backend payment requests, and no horizontal overflow at 360/390/412px. The development preview is `http://localhost:8093` (Profile → Credits); it does not perform checkout.
 
-The capture settings page could not yet be inspected: automatic approval review blocked its navigation control as potentially changing payment configuration. Capture settings were not changed. Confirm the provider's TEST automatic-capture setting before native checkout. No payment delivery/replay tooling was exposed in the inspected webhook details view; use an actual test checkout and its resulting delivery record for the outstanding end-to-end checks.
+The capture settings page was subsequently inspected read-only with owner authorization: **Automatic Capture enabled, 12-minute auto-capture timeout**, with instant refund for authorization after that window. Manual capture was not shown as enabled. No capture/refund settings were changed. The page warns that Orders API capture values can override dashboard settings; NearHire's order request sends amount, currency and receipt without a capture override. No payment delivery/replay tooling was exposed in the inspected webhook details view; use an actual test checkout and its resulting delivery record for the outstanding end-to-end checks.
+
+### Authenticated TEST order verification — 14 September 2026
+
+Hosted email authentication was already enabled and phone authentication remained disabled. There was no dedicated payment-test user or external test-user credential file available. Using authorized Supabase administration, an isolated, non-personal `example.invalid` email/password account was created with `app_metadata.purpose=nearhire_payment_test`. Its email was explicitly admin-confirmed for this synthetic test account; this is not a claim of mailbox ownership or successful email delivery. No phone number was supplied or verified. No auth settings, consumer login screens, JWT validation or RLS policies were changed, and the user was not granted admin access.
+
+The test profile is named `NearHire Payment TEST` and hidden from public discovery (`visible=false`). Password material is cryptographically generated and stored only in `C:\PROJECTS\NEARHIRE-SECRETS\payment-test-user.env`, together with the synthetic login identifier and persistent order request UUID. That filename is also ignored defensively if accidentally placed inside Git. No credentials were added to examples, mobile public configuration, or source.
+
+The development authentication harness runs outside the repository and is not an app entry point, route, bundle or deployed function. It uses the existing Supabase Auth password sign-in endpoint, obtains a genuine session, and validates it with `auth.getUser()`. It then uses that user's JWT and the public key for normal RLS reads and the existing `payment-order` Edge Function. Administrative credentials are used only for provisioning/hiding the test profile; they are never used as the purchaser's identity. Tokens remain in memory, and the harness clears its local session on completion. Future tests should reuse the external account/request UUID, not create another account or manually edit credits. Supabase references: [admin createUser](https://supabase.com/docs/reference/javascript/auth-admin-createuser), [signInWithPassword](https://supabase.com/docs/reference/javascript/auth-signinwithpassword).
+
+| Check | Observed result |
+|---|---|
+| Test-user ID | `270e2bb0-6bec-4292-8133-4c014a7396fc` |
+| Session and RLS identity | PASS: hosted Auth validates the user; credit read returns only that user's account |
+| Starting balance | 5, from the normal signup trigger; no ledger reset |
+| Normal authenticated order API | PASS: `single` package, 1 credit, 900 paise, INR |
+| Internal order | `bf546407-2d81-40f1-b8ee-9a5730623702` |
+| Razorpay TEST order | `order_TbbVCMRXiCdKlO` |
+| Provider read | HTTP 200; receipt matches internal order; status `created`, amount paid 0, attempts 0 |
+| Repeated request UUID | PASS: returned the same provider order; exactly one internal order |
+| Balance after order creation | 5; only the original signup +5 ledger entry, no purchase award |
+| Admin-side database inspection | Unpaid order exists with its profile; no payment or purchase-ledger row. Admin UI checkout-result validation NOT RUN |
+| Actual checkout/capture and real webhook | NOT RUN; no payment event observed from a checkout |
+| Exact +1 award, paid admin record, webhook recovery/replay | NOT RUN against an actual provider payment; covered only by automated settlement tests |
+
+**BACKEND SETTLEMENT TEST:** authentication, RLS, authoritative order creation and order retry are verified against hosted services. The provider-backed settlement path is still untested because no checkout has occurred. The unpaid order and unchanged balance are consistent; no contradictory settlement records were found.
+
+Validation for this authenticated-order stage passed: mobile/admin TypeScript, ESLint, 23 mobile/payment-related unit tests, 2 localization tests, 40 database/PostGIS scenarios, six application Edge Function type checks, three Edge security tests, admin production build and mobile web export. Exact-value scanning checked 146 tracked files plus four exported mobile text artifacts against the external test password and backend secrets: no matches. The general tracked-source credential scan also reported no findings. `git diff --check` passed. Only this document and the defensive credential-filename ignore rule were changed in the repository for this stage.
+
+**NATIVE ANDROID CHECKOUT TEST:** `checkout.ts` uses `react-native-razorpay`; `checkout.web.ts` explicitly throws `ANDROID_REQUIRED`. Web preview is not a native checkout test. Complete one ₹9 TEST checkout, confirm capture and real webhook delivery, verify balance 5 → 6 and one purchase row, then inspect the paid admin record and replay behavior. Do not manufacture payment IDs/signatures or call settlement directly to claim success.
+
+### Approved Android development build preparation
+
+The owner subsequently approved only an Android development APK. The existing EAS project is `gnanoos-team/nearhire`, ID `9788df17-3b02-4cd3-b594-8daff14abcad`, package `app.nearhire.mobile`. Use `eas build --platform android --profile development`; production APK/AAB and live payments remain unauthorized. The development profile explicitly disables fixture preview/demo flags and enables `EXPO_PUBLIC_PAYMENT_TEST_AUTH=true`. No password is a public environment variable.
+
+After language selection, `DEV · Payment test sign-in` exposes manual email/password inputs only when both `__DEV__` and the explicit test-auth flag are true. It uses ordinary Supabase password authentication and the existing session listener; it never substitutes a JWT or balance. Password input is cleared after the attempt. The release web export was checked with the flag true and contained neither development-login marker nor password input label. Production phone OTP remains unchanged.
+
+Install the development APK on the Android phone, then start Metro on the computer:
+
+```powershell
+cd 'C:\PROJECTS\NEAR HIRE\apps\mobile'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-payment-test.ps1
+```
+
+Keep phone and computer on the same trusted LAN; open the development client's Metro URL/QR on port 8094. The launcher loads only the external public map configuration and existing Supabase public variables, not the test password. Manually use the credentials from the external `payment-test-user.env` in the DEV form, complete normal profile setup if prompted, and open Profile → Job Credits. Confirm the server balance of 5 before buying the single-credit ₹9 TEST package. The UI may create a new order using its own persisted request UUID; the prior unpaid configuration order is not a payment and must not be marked paid manually.
+
+After a real successful checkout, verify both credit shortcuts and the credit-history screen show authoritative balance 6, and correlate the actual provider payment ID, webhook event, one purchase row and admin record. Replay that real event once (do not fabricate a signed capture), verify no second award, then test cancellation without purchase. Publish only the intended safe TEST job through normal Post Work and verify 6 → 5, active status and 24-hour expiry. MapLibre rendering, GPS and FCM initialization require physical-device evidence. The MapTiler client credential is temporary development material and must be rotated before production.
 
 APK build is paused until explicit owner approval. Web preview only displays payment UI; selecting a package and continuing does not create a Razorpay order or add credits.
 
