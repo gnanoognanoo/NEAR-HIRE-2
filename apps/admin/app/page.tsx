@@ -25,7 +25,7 @@ const fields: Record<string, string[]> = {
     "status",
     "created_at",
   ],
-  credit_transactions: ["delta", "reason", "created_at"],
+  credit_transactions: ["user_id", "delta", "reason", "reference", "created_at", "expires_at"],
   admin_actions: ["action", "reason", "created_at"],
 };
 export default async function Dashboard({

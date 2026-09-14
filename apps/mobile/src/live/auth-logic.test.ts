@@ -112,3 +112,95 @@ test("session timeout releases loading while successful restoration passes throu
   assert.equal(await withAuthTimeout(Promise.resolve("restored"), 50), "restored");
   await assert.rejects(withAuthTimeout(new Promise(() => {}), 5), /timeout/);
 });
+import { createPhoneAuth, completeLogout } from "./auth-operations.ts";
+
+test("send and verify use the real production transport contract", async () => {
+  let sent = 0,
+    verified = 0;
+  const service = createPhoneAuth(() => ({
+    async signInWithOtp(input) {
+      assert.deepEqual(input, { phone: "+919876543210", options: { shouldCreateUser: true } });
+      sent++;
+      return { error: null };
+    },
+    async verifyOtp(input) {
+      assert.equal(input.phone, "+919876543210");
+      assert.equal(input.type, "sms");
+      verified++;
+      return { data: { session: { user: { id: "fixture" } } }, error: null };
+    },
+  }));
+  await assert.rejects(service.send("bad"), /INVALID_PHONE/);
+  assert.equal(sent, 0);
+  await service.send("9876543210");
+  await assert.rejects(service.send("9876543210"), /RATE_LIMITED/);
+  await assert.rejects(service.verify("9876543210", "bad"), /INVALID_OTP/);
+  await service.verify("9876543210", String(100000 + Math.floor(Math.random() * 900000)));
+  assert.equal(sent, 1);
+  assert.equal(verified, 1);
+});
+
+test("provider errors, incorrect/expired/used codes and missing sessions cannot authenticate", async () => {
+  for (const code of [
+    "invalid_credentials",
+    "otp_expired",
+    "over_request_rate_limit",
+    "sms_send_failed",
+  ]) {
+    const error = { code };
+    const service = createPhoneAuth(() => ({
+      async signInWithOtp() {
+        return { error };
+      },
+      async verifyOtp() {
+        return { data: { session: null }, error };
+      },
+    }));
+    await assert.rejects(service.send("9876543210"), (e) => e === error);
+    await assert.rejects(service.verify("9876543210", "654321"), (e) => e === error);
+    assert.notEqual(authErrorKey(error), "genericError");
+  }
+  const service = createPhoneAuth(() => ({
+    async signInWithOtp() {
+      return { error: null };
+    },
+    async verifyOtp() {
+      return { data: { session: null }, error: null };
+    },
+  }));
+  await assert.rejects(service.verify("9876543210", "654321"), /AUTH_REQUIRED/);
+});
+
+test("logout unregisters before sign-out and clears only after successful sign-out", async () => {
+  const calls: string[] = [];
+  const steps = {
+    unregister: async () => {
+      calls.push("unregister");
+    },
+    signOut: async () => {
+      calls.push("signOut");
+      return { error: null };
+    },
+    clear: async () => {
+      calls.push("clear");
+    },
+  };
+  await completeLogout(steps);
+  assert.deepEqual(calls, ["unregister", "signOut", "clear"]);
+  calls.length = 0;
+  await assert.rejects(
+    completeLogout({
+      ...steps,
+      unregister: async () => {
+        throw new Error("offline");
+      },
+    }),
+    /offline/,
+  );
+  assert.deepEqual(calls, []);
+  await assert.rejects(
+    completeLogout({ ...steps, signOut: async () => ({ error: new Error("offline") }) }),
+    /offline/,
+  );
+  assert.deepEqual(calls, ["unregister"]);
+});

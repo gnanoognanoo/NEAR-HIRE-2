@@ -2,15 +2,15 @@
 
 ## Architecture and current state
 
-Workers do not pay to create a profile, search or apply. Posting costs one credit using the existing transactional `publish_job` RPC; repost creates a new job, preserves the old record and spends one credit. The auth-user creation trigger awards five starter credits once per account. `signup:<user-id>` and a partial unique index prevent duplicate awards. Login, reinstall, profile edits and workspace changes do not grant credits. Account recreation eligibility/anti-abuse is a separate policy from same-account idempotency.
+Workers do not pay to create a profile, search or apply. Posting costs one credit using the existing transactional `publish_job` RPC; repost creates a new job, preserves the old record and spends one credit. The auth-user creation trigger awards ten welcome credits once per account, plus two current-month credits under [Credit V2](credits.md). `signup:<user-id>` and a partial unique index prevent duplicate awards. Login, reinstall, profile edits and workspace changes do not grant credits. Account recreation eligibility/anti-abuse is a separate policy from same-account idempotency.
 
 Existing infrastructure was extended, not replaced: `credit_packages`, `job_credits`, `credit_transactions`, `payment_orders`, `payments`, `payment_events`, `prepare_payment`, `settle_payment`, native `react-native-razorpay`, and the admin dashboard. Migration `202609130001_test_payments.sql` replaces launch catalog values, adds server test configuration, refund event recording and accounting retention. Historical orders keep their snapshotted prices and credit counts.
 
-| ID | Credits | Amount in paise | Label |
-|---|---:|---:|---|
-| single | 1 | 900 | Occasional Hiring |
-| five | 5 | 3900 | Popular |
-| ten | 10 | 6900 | Best Value |
+| ID     | Credits | Amount in paise | Label             |
+| ------ | ------: | --------------: | ----------------- |
+| single |       1 |             900 | Occasional Hiring |
+| five   |       5 |            3900 | Popular           |
+| ten    |      10 |            6900 | Best Value        |
 
 All prices are INR. Savings are calculated from the active single-credit price: ₹6 for five and ₹21 for ten at launch. Live UI reads the catalog from the server; development fixtures are separate and never used for settlement. Old packages are inactive rather than deleted.
 
@@ -44,19 +44,19 @@ Verified on 13 September 2026: the external `C:\PROJECTS\NEARHIRE-SECRETS\razorp
 
 ### Configuration verification results — 13 September 2026
 
-| Check | Result |
-|---|---|
-| Hosted active package catalog | PASS: 1/900, 5/3900, 10/6900, all INR |
-| Provider TEST order: 1 credit / ₹9 | HTTP 200, `order_TbXPvfcCAf21lW`, 900 paise, created |
-| Provider TEST order: 5 credits / ₹39 | HTTP 200, `order_TbXPvzUcPIRfCY`, 3900 paise, created |
-| Provider TEST order: 10 credits / ₹69 | HTTP 200, `order_TbXPw8gAMo8TbA`, 6900 paise, created |
-| Unauthenticated order and verification endpoints | Both HTTP 401 `AUTH_REQUIRED` |
-| Hosted webhook invalid signature | HTTP 401 `INVALID_SIGNATURE` |
-| Hosted webhook valid HMAC over an ignored configuration event | HTTP 200, received; no settlement attempted |
-| Existing Razorpay TEST webhook | One endpoint, enabled, four handled events, secret configured |
-| Authenticated internal purchase / actual checkout | AUTH BLOCKED / NOT RUN: no authenticated NearHire test-user session; native build paused |
-| Actual capture, client checkout signature, provider delivery/replay | NOT RUN |
-| Hosted purchase award, purchase-then-publish, recovery, admin payment record | NOT RUN |
+| Check                                                                        | Result                                                                                   |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Hosted active package catalog                                                | PASS: 1/900, 5/3900, 10/6900, all INR                                                    |
+| Provider TEST order: 1 credit / ₹9                                           | HTTP 200, `order_TbXPvfcCAf21lW`, 900 paise, created                                     |
+| Provider TEST order: 5 credits / ₹39                                         | HTTP 200, `order_TbXPvzUcPIRfCY`, 3900 paise, created                                    |
+| Provider TEST order: 10 credits / ₹69                                        | HTTP 200, `order_TbXPw8gAMo8TbA`, 6900 paise, created                                    |
+| Unauthenticated order and verification endpoints                             | Both HTTP 401 `AUTH_REQUIRED`                                                            |
+| Hosted webhook invalid signature                                             | HTTP 401 `INVALID_SIGNATURE`                                                             |
+| Hosted webhook valid HMAC over an ignored configuration event                | HTTP 200, received; no settlement attempted                                              |
+| Existing Razorpay TEST webhook                                               | One endpoint, enabled, four handled events, secret configured                            |
+| Authenticated internal purchase / actual checkout                            | AUTH BLOCKED / NOT RUN: no authenticated NearHire test-user session; native build paused |
+| Actual capture, client checkout signature, provider delivery/replay          | NOT RUN                                                                                  |
+| Hosted purchase award, purchase-then-publish, recovery, admin payment record | NOT RUN                                                                                  |
 
 The three orders above are provider-level configuration probes, not internal NearHire purchase orders. Hosted queries confirm zero internal rows for those provider IDs, zero payments and zero payment events at verification time. No credits were awarded and no money was captured. The signed ignored-event probe confirms the deployed HMAC path with the supplied secret, but does not prove Razorpay delivery or dashboard-secret equality. SQL idempotency tests and signature unit tests do not substitute for real checkout or duplicate delivery testing.
 
@@ -72,20 +72,20 @@ The test profile is named `NearHire Payment TEST` and hidden from public discove
 
 The development authentication harness runs outside the repository and is not an app entry point, route, bundle or deployed function. It uses the existing Supabase Auth password sign-in endpoint, obtains a genuine session, and validates it with `auth.getUser()`. It then uses that user's JWT and the public key for normal RLS reads and the existing `payment-order` Edge Function. Administrative credentials are used only for provisioning/hiding the test profile; they are never used as the purchaser's identity. Tokens remain in memory, and the harness clears its local session on completion. Future tests should reuse the external account/request UUID, not create another account or manually edit credits. Supabase references: [admin createUser](https://supabase.com/docs/reference/javascript/auth-admin-createuser), [signInWithPassword](https://supabase.com/docs/reference/javascript/auth-signinwithpassword).
 
-| Check | Observed result |
-|---|---|
-| Test-user ID | `270e2bb0-6bec-4292-8133-4c014a7396fc` |
-| Session and RLS identity | PASS: hosted Auth validates the user; credit read returns only that user's account |
-| Starting balance | 5, from the normal signup trigger; no ledger reset |
-| Normal authenticated order API | PASS: `single` package, 1 credit, 900 paise, INR |
-| Internal order | `bf546407-2d81-40f1-b8ee-9a5730623702` |
-| Razorpay TEST order | `order_TbbVCMRXiCdKlO` |
-| Provider read | HTTP 200; receipt matches internal order; status `created`, amount paid 0, attempts 0 |
-| Repeated request UUID | PASS: returned the same provider order; exactly one internal order |
-| Balance after order creation | 5; only the original signup +5 ledger entry, no purchase award |
-| Admin-side database inspection | Unpaid order exists with its profile; no payment or purchase-ledger row. Admin UI checkout-result validation NOT RUN |
-| Actual checkout/capture and real webhook | NOT RUN; no payment event observed from a checkout |
-| Exact +1 award, paid admin record, webhook recovery/replay | NOT RUN against an actual provider payment; covered only by automated settlement tests |
+| Check                                                      | Observed result                                                                                                      |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Test-user ID                                               | `270e2bb0-6bec-4292-8133-4c014a7396fc`                                                                               |
+| Session and RLS identity                                   | PASS: hosted Auth validates the user; credit read returns only that user's account                                   |
+| Starting balance                                           | 5, from the normal signup trigger; no ledger reset                                                                   |
+| Normal authenticated order API                             | PASS: `single` package, 1 credit, 900 paise, INR                                                                     |
+| Internal order                                             | `bf546407-2d81-40f1-b8ee-9a5730623702`                                                                               |
+| Razorpay TEST order                                        | `order_TbbVCMRXiCdKlO`                                                                                               |
+| Provider read                                              | HTTP 200; receipt matches internal order; status `created`, amount paid 0, attempts 0                                |
+| Repeated request UUID                                      | PASS: returned the same provider order; exactly one internal order                                                   |
+| Balance after order creation                               | 5; only the original signup +5 ledger entry, no purchase award                                                       |
+| Admin-side database inspection                             | Unpaid order exists with its profile; no payment or purchase-ledger row. Admin UI checkout-result validation NOT RUN |
+| Actual checkout/capture and real webhook                   | NOT RUN; no payment event observed from a checkout                                                                   |
+| Exact +1 award, paid admin record, webhook recovery/replay | NOT RUN against an actual provider payment; covered only by automated settlement tests                               |
 
 **BACKEND SETTLEMENT TEST:** authentication, RLS, authoritative order creation and order retry are verified against hosted services. The provider-backed settlement path is still untested because no checkout has occurred. The unpaid order and unchanged balance are consistent; no contradictory settlement records were found.
 
@@ -106,7 +106,7 @@ cd 'C:\PROJECTS\NEAR HIRE\apps\mobile'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-payment-test.ps1
 ```
 
-Keep phone and computer on the same trusted LAN; open the development client's Metro URL/QR on port 8094. The launcher loads only the external public map configuration and existing Supabase public variables, not the test password. Manually use the credentials from the external `payment-test-user.env` in the DEV form, complete normal profile setup if prompted, and open Profile → Job Credits. Confirm the server balance of 5 before buying the single-credit ₹9 TEST package. The UI may create a new order using its own persisted request UUID; the prior unpaid configuration order is not a payment and must not be marked paid manually.
+Keep phone and computer on the same trusted LAN; open the development client's Metro URL/QR on port 8094. The launcher loads only the external public map configuration and existing Supabase public variables, not the test password. Manually use the credentials from the external `payment-test-user.env` in the DEV form, complete normal profile setup if prompted, and open Profile → Job Credits. Confirm the current server-calculated balance (12 after the V2 upgrade if nothing was spent) before buying the single-credit ₹9 TEST package. The UI may create a new order using its own persisted request UUID; the prior unpaid configuration order is not a payment and must not be marked paid manually.
 
 After a real successful checkout, verify both credit shortcuts and the credit-history screen show authoritative balance 6, and correlate the actual provider payment ID, webhook event, one purchase row and admin record. Replay that real event once (do not fabricate a signed capture), verify no second award, then test cancellation without purchase. Publish only the intended safe TEST job through normal Post Work and verify 6 → 5, active status and 24-hour expiry. MapLibre rendering, GPS and FCM initialization require physical-device evidence. The MapTiler client credential is temporary development material and must be rotated before production.
 

@@ -1,3 +1,4 @@
+import CreditBreakdown from "../live/CreditBreakdown";
 import PaymentPackages from "../live/PaymentPackages";
 import { paymentPackages } from "./payment-fixtures";
 import JobSummary from "../live/JobSummary";
@@ -51,7 +52,7 @@ export default function ScreenPreview() {
   const [language, setLanguage] = useState<"en" | "ta">("en");
   const [menu, setMenu] = useState(false);
   const [info, setInfo] = useState(false);
-  const [credits, setCredits] = useState(5);
+  const [credits, setCredits] = useState(12);
   const [radius, setRadius] = useState(3000);
   const { width } = useWindowDimensions();
   const wide = width >= 850;
@@ -102,10 +103,10 @@ export default function ScreenPreview() {
             <>
               <Text style={s.body}>{t("previewInfo")}</Text>
               <View style={[s.row, { maxWidth: "100%", flexShrink: 1 }]}>
-                {[5, 0].map((n) => (
+                {[12, 0].map((n) => (
                   <Choice
                     key={n}
-                    title={t(n ? "creditsPreviewFive" : "creditsPreviewZero")}
+                    title={t(n ? "creditsPreviewTwelve" : "creditsPreviewZero")}
                     selected={credits === n}
                     onPress={() => setCredits(n)}
                   />
@@ -551,6 +552,20 @@ export function Scene({
           <Button title={t("profile")} secondary onPress={() => go("profile")} />
           <Text style={s.title}>{t("profileCredits")}</Text>
           <JobCreditBalance balance={credits} t={t} />
+          <CreditBreakdown
+            t={t}
+            summary={{
+              balance: credits,
+              monthly: Math.max(0, credits - 10),
+              other: Math.min(10, credits),
+              welcome: Math.min(10, credits),
+              purchased: 0,
+              next_expiry: credits > 10 ? "2026-10-14T12:00:00Z" : null,
+              server_now: "2026-09-14T12:00:00Z",
+              publish_cost: 1,
+              repost_cost: 1,
+            }}
+          />
           <Text style={s.heading}>{t("buyJobCredits")}</Text>
           <Text style={s.body}>{t("paymentTestOnly")}</Text>
           <PaymentPackages
@@ -568,8 +583,9 @@ export function Scene({
           <Text style={s.body}>{t("workFree")}</Text>
           <Text style={s.heading}>{t("creditHistory")}</Text>
           <View style={s.card}>
-            <Text style={s.body}>{t("creditSignup")} · +5</Text>
-            {Array.from({ length: 5 - credits }, (_, i) => (
+            <Text style={s.body}>{t("creditSignup")} · +10</Text>
+            <Text style={s.body}>{t("creditMonthly")} · +2</Text>
+            {Array.from({ length: 12 - credits }, (_, i) => (
               <Text key={i} style={s.body}>
                 {t("creditPublish")} · {t("bakeryHelper")} · −1
               </Text>

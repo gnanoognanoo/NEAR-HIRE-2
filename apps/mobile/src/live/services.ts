@@ -1,11 +1,12 @@
+import type { CreditSummary } from "./credit-model";
 import { validateRadiusMetres } from "./radius-logic";
 import { coordinates } from "./location-logic";
-import { normalizePhone, createAuthGate } from "./auth-logic";
+import { createPhoneAuth, completeLogout } from "./auth-operations";
 import { deviceLocation } from "./device-location";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { backend, edge, rpc, storage } from "./client";
-const authGate = createAuthGate();
+
 let loggingOut = false;
 let deviceQueue: Promise<unknown> = Promise.resolve();
 const DEVICE_KEY = "nearhire.push-token";
@@ -20,30 +21,7 @@ function registerToken(token: string) {
   return deviceQueue;
 }
 export const authService = {
-  remaining: () => authGate.remaining(),
-  async send(phone: string) {
-    const number = normalizePhone(phone);
-    return authGate.run("send", async () => {
-      const { error } = await backend().auth.signInWithOtp({
-        phone: number,
-        options: { shouldCreateUser: true },
-      });
-      if (error) throw error;
-      return number;
-    });
-  },
-  async verify(phone: string, token: string) {
-    if (!/^\d{6}$/.test(token)) throw new Error("INVALID_OTP");
-    return authGate.run("verify", async () => {
-      const { data, error } = await backend().auth.verifyOtp({
-        phone: normalizePhone(phone),
-        token,
-        type: "sms",
-      });
-      if (error) throw error;
-      if (!data.session) throw new Error("AUTH_REQUIRED");
-    });
-  },
+  ...createPhoneAuth(() => backend().auth),
   async logout() {
     loggingOut = true;
     try {
@@ -54,10 +32,13 @@ export const authService = {
         if (permission.status === "granted")
           token = (await Notifications.getDevicePushTokenAsync()).data;
       }
-      if (token) await rpc("unregister_device", { p_token: token });
-      const { error } = await backend().auth.signOut({ scope: "local" });
-      if (error) throw error;
-      await storage.removeItem(DEVICE_KEY);
+      await completeLogout({
+        unregister: async () => {
+          if (token) await rpc("unregister_device", { p_token: token });
+        },
+        signOut: () => backend().auth.signOut({ scope: "local" }),
+        clear: () => storage.removeItem(DEVICE_KEY),
+      });
     } finally {
       loggingOut = false;
     }
@@ -171,19 +152,19 @@ export const notificationService = {
   },
 };
 export const creditService = {
+  summary: () => rpc<CreditSummary>("credit_summary"),
   async history(offset = 0) {
+    await rpc("credit_summary");
     const { data, error } = await backend()
       .from("credit_transactions")
-      .select("id,delta,reason,created_at,metadata")
+      .select("id,delta,reason,created_at,metadata,expires_at")
       .order("created_at", { ascending: false })
       .range(offset, offset + 29);
     if (error) throw error;
     return data;
   },
   async balance() {
-    const { data, error } = await backend().from("job_credits").select("balance").single();
-    if (error) throw error;
-    return data.balance as number;
+    return (await rpc<CreditSummary>("credit_summary")).balance;
   },
   async packages() {
     const { data, error } = await backend()

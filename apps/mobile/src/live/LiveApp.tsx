@@ -1,3 +1,5 @@
+import CreditBreakdown from "./CreditBreakdown";
+import { creditReasonKey } from "./credit-model";
 import PaymentPackages from "./PaymentPackages";
 import JobSummary from "./JobSummary";
 import AccountPanel, { WorkspaceChooser } from "./AccountPanel";
@@ -64,9 +66,10 @@ import en from "./locales/en.json";
 import ta from "./locales/ta.json";
 import { jobSchema } from "../../../../packages/core/validation";
 type Lang = "en" | "ta";
-const PaymentTestLogin = __DEV__ && process.env.EXPO_PUBLIC_PAYMENT_TEST_AUTH === "true"
-  ? React.lazy(() => import("../dev/PaymentTestLogin"))
-  : null;
+const PaymentTestLogin =
+  __DEV__ && process.env.EXPO_PUBLIC_PAYMENT_TEST_AUTH === "true"
+    ? React.lazy(() => import("../dev/PaymentTestLogin"))
+    : null;
 type Translate = (key: string) => string;
 
 type Run = (fn: () => Promise<unknown>, success?: string) => Promise<void>;
@@ -286,7 +289,11 @@ export default function LiveApp() {
   ) : !session ? (
     <>
       <PhoneAuth t={t} onVerified={() => setMessage("otpSuccess")} />
-      {PaymentTestLogin && <React.Suspense fallback={<ActivityIndicator />}><PaymentTestLogin /></React.Suspense>}
+      {PaymentTestLogin && (
+        <React.Suspense fallback={<ActivityIndicator />}>
+          <PaymentTestLogin />
+        </React.Suspense>
+      )}
     </>
   ) : profile.isPending ? (
     <ActivityIndicator color={colors.accent} />
@@ -1030,7 +1037,12 @@ function Post({
   const [draft, setDraft] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const [confirmPublish, setConfirmPublish] = useState(false);
-  const creditQuery = useQuery({ queryKey: creditBalanceKey, queryFn: creditService.balance });
+  const creditQuery = useQuery({
+    queryKey: creditBalanceKey,
+    queryFn: creditService.summary,
+    select: (summary) => summary.balance,
+    refetchInterval: 15000,
+  });
   const update = (k: string, v: any) => setP((old: any) => ({ ...old, [k]: v }));
   const submit = (publish: boolean) => {
     const parsed = jobSchema.safeParse({
@@ -1665,7 +1677,8 @@ function Credits({ t }: { t: Translate }) {
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: creditBalanceKey,
-    queryFn: creditService.balance,
+    queryFn: creditService.summary,
+    select: (summary) => summary.balance,
     refetchInterval: 15000,
   });
   const ledger = useInfiniteQuery({
@@ -1673,6 +1686,11 @@ function Credits({ t }: { t: Translate }) {
     queryFn: ({ pageParam }) => creditService.history(pageParam),
     initialPageParam: 0,
     getNextPageParam: (last, all) => (last.length === 30 ? all.length * 30 : undefined),
+    refetchInterval: 15000,
+  });
+  const breakdown = useQuery({
+    queryKey: creditBalanceKey,
+    queryFn: creditService.summary,
     refetchInterval: 15000,
   });
   const packs = useQuery({ queryKey: ["creditPackages"], queryFn: creditService.packages });
@@ -1763,6 +1781,7 @@ function Credits({ t }: { t: Translate }) {
     <View style={{ gap: 16 }}>
       <Text style={s.title}>{t("profileCredits")}</Text>
       <JobCreditBalance balance={q.isError ? null : (q.data ?? null)} t={t} />
+      {breakdown.data && !breakdown.isError && <CreditBreakdown summary={breakdown.data} t={t} />}
       <Button title={t("refresh")} secondary onPress={() => void refresh()} />
       <Text style={s.heading}>{t("buyJobCredits")}</Text>
       <Text style={s.body}>{t("paymentTestOnly")}</Text>
@@ -1800,19 +1819,12 @@ function Credits({ t }: { t: Translate }) {
             {entry.delta > 0 ? "+" : ""}
             {entry.delta}
           </Text>
-          <Text style={s.body}>
-            {t(
-              entry.reason === "signup"
-                ? "creditSignup"
-                : entry.reason === "purchase"
-                  ? "creditPurchase"
-                  : entry.reason === "repost"
-                    ? "creditRepost"
-                    : entry.reason === "publish"
-                      ? "creditPublish"
-                      : "creditOther",
-            )}
-          </Text>
+          <Text style={s.body}>{t(creditReasonKey(entry.reason))}</Text>
+          {entry.expires_at && (
+            <Text style={s.body}>
+              {t("creditExpiryDate")}: {new Date(entry.expires_at).toLocaleDateString()}
+            </Text>
+          )}
           {entry.metadata?.title && <Text style={s.body}>{entry.metadata.title}</Text>}
           {entry.metadata?.amount_paise && (
             <Text style={s.body}>₹{entry.metadata.amount_paise / 100}</Text>
@@ -1852,7 +1864,11 @@ function DeleteAccount({ t, busy, run }: { t: Translate; busy: boolean; run: Run
 }
 
 function LiveCreditChip({ t, onOpen }: { t: Translate; onOpen: () => void }) {
-  const q = useQuery({ queryKey: creditBalanceKey, queryFn: creditService.balance });
+  const q = useQuery({
+    queryKey: creditBalanceKey,
+    queryFn: creditService.summary,
+    select: (summary) => summary.balance,
+  });
   return <CreditBalanceChip balance={q.isError ? null : (q.data ?? null)} t={t} onPress={onOpen} />;
 }
 
@@ -1872,7 +1888,11 @@ function LivePublishAction({
   onConfirm: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const q = useQuery({ queryKey: creditBalanceKey, queryFn: creditService.balance });
+  const q = useQuery({
+    queryKey: creditBalanceKey,
+    queryFn: creditService.summary,
+    select: (summary) => summary.balance,
+  });
   return (
     <>
       <Button

@@ -38,7 +38,7 @@ export default function WorkspacePreview() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
     [screen, setScreen] = useState("chooser"),
     [language, setLanguage] = useState<"en" | "ta">("en"),
-    [credits, setCredits] = useState(5),
+    [credits, setCredits] = useState(12),
     [radius, setRadius] = useState(3000),
     [workerRadius, setWorkerRadius] = useState(3000),
     [query, setQuery] = useState(""),
@@ -200,6 +200,9 @@ export default function WorkspacePreview() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="NearHire"
+                onPress={() => {
+                  if (__DEV__) setDevMenu(true);
+                }}
                 onLongPress={() => {
                   if (__DEV__) setDevMenu(true);
                 }}

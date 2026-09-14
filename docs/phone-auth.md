@@ -1,3 +1,5 @@
+> Current provider decision, hosted readiness and existing-APK instructions: [authentication.md](authentication.md). Results below are historical; do not reinitialize EAS or build another APK from this older checklist.
+
 # Task 2: phone OTP — BLOCKED on SMS provider setup
 
 The repository implementation is ready for provider integration testing. The cleanup migration is deployed and verified. Real OTP testing still requires SMS configuration and the real-device checks below. No SMS credentials or hosted OTP bypasses were added.
@@ -37,25 +39,24 @@ After provider setup and migration deployment, use real numbers you control, inc
 
 Record results in both languages without capturing phone numbers, tokens or codes.
 
-| Test | Expected verification |
-| --- | --- |
-| A Correct OTP | Latest code signs in once, profile/home loads; reuse is rejected. |
-| B Incorrect OTP | Wrong six digits show invalid/expired guidance, no new session; correct retry works. |
-| C Expired OTP | Wait beyond configured expiry; rejection then successful fresh-code request. |
-| D Resend OTP | Rapid taps create one request; wait 60 seconds; latest code works. Background time counts; change-number clears code. |
-| E Rate limiting | Controlled provider test returns localized rate-limit feedback; no retry loop or repeated SMS flood. |
-| F Close/reopen | Swipe app away after login, reopen to same profile. Repeat after access-token expiry and verify foreground refresh. |
-| G Logout/login | Enable push, logout, verify current device row removed and reopen stays signed out. Log in again; other device registration survives. |
-| H New user | New verified account reaches name/locality setup, save routes home. |
-| I Existing user | Completed profile goes home; incomplete profile resumes setup. |
-| J No network | Send/verify show retryable errors. Reconnect and retry once. Expired-session reopen recovers. Offline logout reports failure; reconnect and retry to finish cleanup. |
+| Test            | Expected verification                                                                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A Correct OTP   | Latest code signs in once, profile/home loads; reuse is rejected.                                                                                                    |
+| B Incorrect OTP | Wrong six digits show invalid/expired guidance, no new session; correct retry works.                                                                                 |
+| C Expired OTP   | Wait beyond configured expiry; rejection then successful fresh-code request.                                                                                         |
+| D Resend OTP    | Rapid taps create one request; wait 60 seconds; latest code works. Background time counts; change-number clears code.                                                |
+| E Rate limiting | Controlled provider test returns localized rate-limit feedback; no retry loop or repeated SMS flood.                                                                 |
+| F Close/reopen  | Swipe app away after login, reopen to same profile. Repeat after access-token expiry and verify foreground refresh.                                                  |
+| G Logout/login  | Enable push, logout, verify current device row removed and reopen stays signed out. Log in again; other device registration survives.                                |
+| H New user      | New verified account reaches name/locality setup, save routes home.                                                                                                  |
+| I Existing user | Completed profile goes home; incomplete profile resumes setup.                                                                                                       |
+| J No network    | Send/verify show retryable errors. Reconnect and retry once. Expired-session reopen recovers. Offline logout reports failure; reconnect and retry to finish cleanup. |
 
 ## Tests and troubleshooting
 
 Run npm run check, npm run lint, npm test, npm run test:db from the root. Auth tests cover normalization, validation, exact cooldown boundaries, duplicate prevention, failure retries, routing, session result handling and error mapping. Database tests cover owner-only/idempotent cleanup and anonymous denial. These do not prove SMS delivery or physical-device persistence.
 
 No SMS: check Phone toggle, credentials, provider balance, country permissions, sender/template approvals and redacted delivery logs. Invalid code: use latest SMS for the displayed number; confirm length/expiry then resend once. Rate limit: wait for the server window; do not weaken limits to hide retry defects. Profile errors: check signup trigger and RLS, then retry. Logout error: check network, cleanup migration and Firebase token access. Web session loss after tab closure is expected; validate persistence on Android.
-
 
 ## Changed files and results
 

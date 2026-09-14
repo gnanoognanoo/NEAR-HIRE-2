@@ -9,7 +9,7 @@ test('bilingual package selection calculates savings and never fakes settlement'
   for(const amount of ['₹9','₹39','₹69']) await p.getByText(amount,{exact:true}).waitFor();
   await p.getByText(d.packageSavings.replace('{amount}','6'),{exact:true}).waitFor();await p.getByText(d.packageSavings.replace('{amount}','21'),{exact:true}).waitFor();
   await p.getByRole('radio').nth(1).click();await b(d.continuePayment).click();await p.getByText(d.nativePaymentRequired,{exact:true}).waitFor();
-  await p.getByText('5 '+d.availableCredits,{exact:true}).waitFor();
+  await p.getByText('12 '+d.availableCredits,{exact:true}).waitFor();
   for(const width of [360,390,412]){await p.setViewportSize({width,height:844});assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
  }
  assert.deepEqual(requests,[]);

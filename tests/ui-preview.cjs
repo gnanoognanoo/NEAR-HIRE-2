@@ -44,21 +44,21 @@ test(
         await menus.nth(5).click();
         const chip = (balance) =>
           page.getByRole("button", { name: balance + " " + dict.creditChipLabel, exact: true });
-        await chip(5).click();
+        await chip(12).click();
         await page.getByText(dict.profileCredits, { exact: true }).waitFor();
-        await page.getByText("5 " + dict.availableCredits, { exact: true }).waitFor();
+        await page.getByText("12 " + dict.availableCredits, { exact: true }).waitFor();
         await menus.nth(9).click();
         assert.equal(
-          await page.getByText("5 " + dict.availableCredits, { exact: true }).count(),
+          await page.getByText("12 " + dict.availableCredits, { exact: true }).count(),
           0,
         );
         await page.getByRole("button", { name: dict.publish, exact: true }).click();
         await page.getByText(dict.publishQuestion, { exact: true }).waitFor();
-        await page.getByText(dict.balanceAfter + ": 4", { exact: true }).waitFor();
+        await page.getByText(dict.balanceAfter + ": 11", { exact: true }).waitFor();
         await page.getByRole("button", { name: dict.publishJob, exact: true }).click();
         await menus.nth(5).click();
-        await chip(4).click();
-        await page.getByText("4 " + dict.availableCredits, { exact: true }).waitFor();
+        await chip(11).click();
+        await page.getByText("11 " + dict.availableCredits, { exact: true }).waitFor();
         await page.getByRole("button", { name: dict.developerInfo, exact: true }).click();
         await page.getByRole("button", { name: dict.creditsPreviewZero, exact: true }).click();
         await page.getByText(dict.noCredits, { exact: true }).waitFor();
@@ -68,7 +68,7 @@ test(
         await menus.nth(9).click();
         await page.getByRole("button", { name: dict.goJobCredits, exact: true }).click();
         await page.getByText(dict.profileCredits, { exact: true }).waitFor();
-        await page.getByRole("button", { name: dict.creditsPreviewFive, exact: true }).click();
+        await page.getByRole("button", { name: dict.creditsPreviewTwelve, exact: true }).click();
         await page.getByRole("button", { name: dict.developerInfo, exact: true }).click();
         await menus.nth(12).click();
         await page.getByRole("button", { name: dict.filters, exact: true }).click();

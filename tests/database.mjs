@@ -1,3 +1,4 @@
+import { testCreditsV2 } from "./credits-v2.mjs";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
@@ -24,7 +25,13 @@ for (const file of [
   "202609100001_custom_search_radius.sql",
   "202609100002_workspaces_worker_discovery.sql",
   "202609130001_test_payments.sql",
+  "202609140001_credit_entitlements_v2.sql",
 ]) {
+  if (file === "202609140001_credit_entitlements_v2.sql") {
+    await pg.exec(
+      "insert into auth.users values ('93000000-0000-0000-0000-000000000001','+919000000091'),('93000000-0000-0000-0000-000000000002','+919000000092'); insert into public.credit_transactions(user_id,delta,reason,reference) values ('93000000-0000-0000-0000-000000000002',5,'admin_adjustment','legacy-admin'); update public.job_credits set balance=10 where user_id='93000000-0000-0000-0000-000000000002';",
+    );
+  }
   let sql = await readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8");
   sql = sql.replace(
     "create extension if not exists pg_cron with schema pg_catalog;",
@@ -86,6 +93,50 @@ const input = {
   longitude: 80.21,
   required_languages: ["ta"],
 };
+
+await check(
+  "auth lifecycle cannot duplicate signup credit and duplicate ledger awards are rejected",
+  async () => {
+    const id = crypto.randomUUID();
+    await pg.query("insert into auth.users values ($1,$2)", [id, "+919000000099"]);
+    for (const table of ["profiles", "worker_profiles", "job_credits"]) {
+      const column = table === "profiles" ? "id" : "user_id";
+      assert.equal(
+        (await pg.query(`select count(*)::int n from public.${table} where ${column}=$1`, [id]))
+          .rows[0].n,
+        1,
+      );
+    }
+    // Model repeated authenticated requests/identity restoration, not hosted token generation.
+    for (let i = 0; i < 3; i++) {
+      await asUser(id, () =>
+        rpc("save_profile", [{ name: "Auth fixture", locality: "Chennai", languages: ["ta"] }]),
+      );
+      await pg.query("update auth.users set phone=phone where id=$1", [id]);
+    }
+    assert.equal(
+      (await pg.query("select balance from public.job_credits where user_id=$1", [id])).rows[0]
+        .balance,
+      12,
+    );
+    assert.equal(
+      (
+        await pg.query(
+          "select count(*)::int n from public.credit_transactions where user_id=$1 and reason='signup'",
+          [id],
+        )
+      ).rows[0].n,
+      1,
+    );
+    await assert.rejects(
+      pg.query(
+        "insert into public.credit_transactions(user_id,delta,reason,reference) values($1,5,'signup',$2)",
+        [id, "duplicate:" + id],
+      ),
+    );
+  },
+);
+
 await check("profile edits cannot set admin, credit or suspension fields", async () => {
   await asUser(owner, () =>
     rpc("save_profile", [
@@ -117,7 +168,7 @@ await check("draft and publication retries spend exactly one credit", async () =
   assert.equal(
     (await pg.query("select balance from public.job_credits where user_id=$1", [owner])).rows[0]
       .balance,
-    4,
+    11,
   );
 });
 await check("real PostGIS radius query returns nearby and excludes distant jobs", async () => {
@@ -245,7 +296,7 @@ await check("payment settlement is server-only, checks amount, and credits once"
   assert.equal(
     (await pg.query("select balance from public.job_credits where user_id=$1", [worker])).rows[0]
       .balance,
-    6,
+    13,
   );
 });
 await check("non-admin cannot read metrics or moderate", async () => {
@@ -801,7 +852,7 @@ await check("starter award survives relogin and mode changes without duplication
   assert.equal(
     (await pg.query("select balance from public.job_credits where user_id=$1", [buyer])).rows[0]
       .balance,
-    5,
+    12,
   );
   assert.equal(
     (
@@ -972,10 +1023,10 @@ await check(
       rpc("save_profile", [{ name: "Payment test", locality: "Anna Nagar", languages: ["ta"] }]),
     );
     await pg.query(
-      "insert into public.credit_transactions(user_id,delta,reason,reference) values($1,-4,'test_setup','test-credit-setup')",
+      "insert into public.credit_transactions(user_id,delta,reason,reference) values($1,-11,'test_setup','test-credit-setup')",
       [u],
     );
-    await pg.query("update public.job_credits set balance=1 where user_id=$1", [u]);
+
     const id = await asUser(u, () => rpc("create_job", [input, crypto.randomUUID()]));
     await asUser(u, () => rpc("publish_job", [id]));
     await asUser(u, () => rpc("publish_job", [id]));
@@ -1011,6 +1062,7 @@ await check(
     );
   },
 );
+await testCreditsV2({ pg, check, asUser, rpc, input });
 console.log(
   `${checks} database integration scenarios passed. Real PostGIS; mocked Auth identity and cron registration only.`,
 );
