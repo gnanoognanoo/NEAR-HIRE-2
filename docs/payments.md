@@ -110,6 +110,17 @@ Keep phone and computer on the same trusted LAN; open the development client's M
 
 After a real successful checkout, verify both credit shortcuts and the credit-history screen show authoritative balance 6, and correlate the actual provider payment ID, webhook event, one purchase row and admin record. Replay that real event once (do not fabricate a signed capture), verify no second award, then test cancellation without purchase. Publish only the intended safe TEST job through normal Post Work and verify 6 → 5, active status and 24-hour expiry. MapLibre rendering, GPS and FCM initialization require physical-device evidence. The MapTiler client credential is temporary development material and must be rotated before production.
 
+### Development APK result — 14 September 2026
+
+- EAS build **FINISHED**, first attempt: `f63aeda2-8093-4ee3-9aff-e5c9e33ab74f`.
+- [Build and APK installation page](https://expo.dev/accounts/gnanoos-team/projects/nearhire/builds/f63aeda2-8093-4ee3-9aff-e5c9e33ab74f).
+- Source commit: `b8fdc85efdcb09aea3fdb67c44aa0ae7fe9f3d44`; profile `development`, internal Android APK, package `app.nearhire.mobile`. No production APK/AAB or live-payment build was created.
+- MapTiler style, source, tile, sprite JSON/PNG and glyph checks all returned HTTP 200; attribution present. EAS development map style was configured, Firebase package matched, and native autolinking confirmed Razorpay and MapLibre.
+- TypeScript/lint, 23 mobile/unit and 2 localization tests, 40 database/PostGIS scenarios, six Edge Function type checks, three Edge security tests, admin/web build and Android/Hermes export passed after the development-auth change.
+- Downloaded APK size: 224,756,340 bytes. All 1,444 ZIP entries were inspected; no matches for the Razorpay API/webhook secrets, Firebase private key (PEM/escaped/base64/DER forms), Supabase service-role key or test password. Razorpay, MapLibre and Firebase Messaging class names and the intended Android package were present. Class presence proves packaging, not runtime initialization or delivery.
+- No Android device was connected to ADB at completion. Installation, native checkout, actual capture, real webhook/replay, purchase credit history, paid admin record, cancellation/failure/recovery, test-job publication, native maps/GPS and FCM initialization remain **NOT RUN**. Authoritative balance last verified: 5; no purchased credit or job-publication deduction was fabricated.
+- Metro development server is prepared on port 8094 via the launcher above. Use the EAS installation page on the Android phone, then connect to the computer's development server. The dev-client app requires Metro to serve the current JavaScript; the static APK scan does not replace source/bundle scanning after future code changes.
+
 APK build is paused until explicit owner approval. Web preview only displays payment UI; selecting a package and continuing does not create a Razorpay order or add credits.
 
 Once an approved Android development app and hosted phone login are available:
