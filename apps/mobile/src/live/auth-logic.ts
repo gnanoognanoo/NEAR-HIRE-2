@@ -29,6 +29,18 @@ export function restoredSession<T>(result: {
 export function authErrorKey(error: unknown): string {
   const e = error as { code?: string; message?: string; status?: number; name?: string } | null;
   const code = e?.code || e?.message || "";
+  if (code === "OAUTH_CANCELLED") return "googleCancelled";
+  if (code === "OAUTH_CALLBACK_INVALID" || code === "OAUTH_FAILED") return "googleFailed";
+  if (
+    [
+      "identity_already_exists",
+      "phone_exists",
+      "user_already_exists",
+      "IDENTITY_MISMATCH",
+    ].includes(code)
+  )
+    return "identityConflict";
+  if (code === "manual_linking_disabled") return "linkingUnavailable";
   if (code === "INVALID_PHONE" || code === "phone_number_invalid") return "phoneError";
   if (code === "INVALID_OTP" || code === "otp_disabled" || code === "invalid_credentials")
     return "otpIncorrect";
@@ -41,6 +53,10 @@ export function authErrorKey(error: unknown): string {
       "sms_send_failed",
       "provider_disabled",
       "SERVICE_NOT_CONFIGURED",
+      "hook_error",
+      "hook_timeout",
+      "hook_timeout_after_retry",
+      "unexpected_failure",
     ].includes(code)
   )
     return "authProviderUnavailable";

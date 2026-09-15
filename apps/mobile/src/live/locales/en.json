@@ -335,5 +335,21 @@
   "creditExpiryDate": "Expiry date",
   "creditExpiryRule": "Monthly credits expire 30 days after grant and are used first. Welcome and purchased credits do not expire.",
   "monthlyCreditsAdded": "Monthly Credits Added",
-  "creditsPreviewTwelve": "12 credits"
+  "creditsPreviewTwelve": "12 credits",
+  "continueGoogle": "Continue with Google",
+  "continuePhone": "Continue with Phone",
+  "loginTagline": "Find work. Hire nearby.",
+  "authOr": "OR",
+  "loginSecurity": "Login & Security",
+  "linkGoogle": "Link Google Account",
+  "googleConnected": "Google connected",
+  "googleNotConnected": "Google not connected",
+  "phoneNotVerified": "Phone not verified",
+  "phoneVerification": "Verify your phone",
+  "googleFailed": "Google sign-in could not be completed. Please try again or use your existing login method.",
+  "googleCancelled": "Google sign-in was cancelled. You can try again.",
+  "identityConflict": "This sign-in method belongs to another account, or your session changed. Sign in to your original account. Accounts cannot be merged here.",
+  "linkingUnavailable": "Account linking is not available yet. Please try again later.",
+  "identityAdvice": "Already have a NearHire account? Sign in using your existing method, then link another method here to keep your wallet and history.",
+  "googleUnavailable": "Google sign-in is temporarily unavailable. Please try again later."
 }

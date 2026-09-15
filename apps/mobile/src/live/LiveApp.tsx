@@ -24,6 +24,9 @@ import {
 import LocationPicker from "./LocationPicker";
 import { activeNearby, type Position } from "./location-logic";
 import PhoneAuth from "./PhoneAuth";
+import GoogleButton from "./GoogleButton";
+import LoginSecurity from "./LoginSecurity";
+import { resumeGoogleAuth } from "./google-auth";
 import { profileComplete, restoredSession, authErrorKey, withAuthTimeout } from "./auth-logic";
 import React, { useEffect, useState, useRef, createContext, useContext } from "react";
 import {
@@ -95,7 +98,7 @@ function Feedback() {
   const { error, message, busy, t } = useContext(FeedbackContext);
   return (
     <>
-      {busy && <ActivityIndicator color={colors.accent} />}{" "}
+      {busy && <ActivityIndicator color={colors.accent} />}
       {!!error && (
         <Text accessibilityRole="alert" style={s.body}>
           {t(error)}
@@ -136,7 +139,16 @@ export default function LiveApp() {
     setBootError(false);
     Promise.all([
       AsyncStorage.getItem("nearhire.language"),
-      db ? withAuthTimeout(db.auth.getSession()) : undefined,
+      db
+        ? withAuthTimeout(
+            resumeGoogleAuth()
+              .catch((e) => {
+                if (alive)
+                  setError(authErrorKey(e) === "genericError" ? "googleFailed" : authErrorKey(e));
+              })
+              .then(() => db!.auth.getSession()),
+          )
+        : undefined,
     ])
       .then(([l, a]) => {
         if (alive) {
@@ -288,7 +300,15 @@ export default function LiveApp() {
     </>
   ) : !session ? (
     <>
+      <Text style={s.title}>{t("loginTagline")}</Text>
+      <GoogleButton t={t} />
+      <Text style={[s.body, { textAlign: "center" }]}>{t("authOr")}</Text>
       <PhoneAuth t={t} onVerified={() => setMessage("otpSuccess")} />
+      <Text style={s.body}>{t("identityAdvice")}</Text>
+      <View style={s.row}>
+        <Choice title="English" selected={language === "en"} onPress={() => choose("en")} />
+        <Choice title="தமிழ்" selected={language === "ta"} onPress={() => choose("ta")} />
+      </View>
       {PaymentTestLogin && (
         <React.Suspense fallback={<ActivityIndicator />}>
           <PaymentTestLogin />
@@ -304,18 +324,21 @@ export default function LiveApp() {
       <Button title={t("logout")} secondary onPress={() => run(authService.logout, "")} />
     </>
   ) : !profileComplete(profile.data) ? (
-    <ProfileForm
-      initial={profile.data}
-      language={language}
-      t={t}
-      busy={busy}
-      onSave={(p) =>
-        run(async () => {
-          await profileService.save(p);
-          setScreen("profile");
-        })
-      }
-    />
+    <>
+      <LoginSecurity user={session.user} t={t} />
+      <ProfileForm
+        initial={profile.data}
+        language={language}
+        t={t}
+        busy={busy}
+        onSave={(p) =>
+          run(async () => {
+            await profileService.save(p);
+            setScreen("profile");
+          })
+        }
+      />
+    </>
   ) : !workspace ? (
     <WorkspaceChooser t={t} onChoose={(w) => void switchWorkspace(w)} />
   ) : (
@@ -424,9 +447,13 @@ export default function LiveApp() {
           />
         </>
       )}
+      {screen === "loginSecurity" && (
+        <LoginSecurity key={session.user.id} user={session.user} t={t} />
+      )}
       {screen === "settings" && (
         <>
           <Text style={s.title}>{t("settings")}</Text>
+          <Button title={t("loginSecurity")} secondary onPress={() => setScreen("loginSecurity")} />
           <View style={s.row}>
             <Choice
               title="English"

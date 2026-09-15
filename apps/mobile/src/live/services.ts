@@ -6,6 +6,7 @@ import { deviceLocation } from "./device-location";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { backend, edge, rpc, storage } from "./client";
+import { clearPendingOAuth } from "./google-auth";
 
 let loggingOut = false;
 let deviceQueue: Promise<unknown> = Promise.resolve();
@@ -37,7 +38,10 @@ export const authService = {
           if (token) await rpc("unregister_device", { p_token: token });
         },
         signOut: () => backend().auth.signOut({ scope: "local" }),
-        clear: () => storage.removeItem(DEVICE_KEY),
+        clear: async () => {
+          await storage.removeItem(DEVICE_KEY);
+          await clearPendingOAuth();
+        },
       });
     } finally {
       loggingOut = false;

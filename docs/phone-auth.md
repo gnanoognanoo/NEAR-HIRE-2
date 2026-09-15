@@ -23,7 +23,7 @@ Logout serializes with device registration, unregisters the current user's curre
 Project: mxsltkyebhboaglbspse. Confirmed on 7 September 2026: hosted phone auth is disabled. No provider setting was changed. Database connectivity recovered and the cleanup migration was deployed through the normal Supabase workflow.
 
 1. Open Authentication → Sign In / Providers → Phone in the existing Supabase dashboard.
-2. Provision a supported SMS provider. Twilio is supported: supply its real Account SID, Auth Token and required messaging/sender details directly in Supabase. Activate/fund the provider account, allow Indian delivery, and complete the sender/template approvals the provider requires. Never paste credentials into source or chat.
+2. Current decision: use the signed Supabase Send SMS Hook with 2Factor. Follow authentication.md for the template API, credentials, reservation migration and controlled setup. The previous built-in Twilio recommendation is superseded.
 3. Enable Phone and new-user signup. Match this app with six-digit SMS OTPs. Configure an explicit expiry (suggested 300 seconds) and minimum send interval of 60 seconds. Review SMS-send and verification rate limits against expected traffic and budget. The service can require a longer wait than the UI timer.
 4. Verify the SMS template includes Supabase's required token placeholder and matches the provider-approved template. Never configure fixed hosted test OTPs or copy local config.toml test_otp settings into production.
 5. Retain appropriate nearhire:// and HTTPS redirects where needed; direct code entry needs no OAuth redirect. If enabling CAPTCHA, first implement a compatible client token flow; this app does not currently supply CAPTCHA tokens.

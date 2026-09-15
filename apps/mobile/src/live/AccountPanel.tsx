@@ -65,6 +65,7 @@ export default function AccountPanel({
         <Text style={s.body}>{t("workspaceFlexible")}</Text>
       </View>
       <Button title={t("profileCredits")} secondary onPress={() => onNavigate("credits")} />
+      <Button title={t("loginSecurity")} secondary onPress={() => onNavigate("loginSecurity")} />
       <Button title={t("preferences")} secondary onPress={() => onNavigate("preferences")} />
       <View style={s.card}>
         <Text style={s.heading}>{t("myActivity")}</Text>

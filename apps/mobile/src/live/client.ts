@@ -37,6 +37,7 @@ export const db = configured
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
+        flowType: "pkce",
       },
       global: {
         fetch: async (input, init) =>

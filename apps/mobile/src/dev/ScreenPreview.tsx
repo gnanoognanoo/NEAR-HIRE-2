@@ -344,6 +344,14 @@ export function Scene({
       body = (
         <>
           {title("login")}
+          {screen === "login" && (
+            <>
+              <Text style={s.heading}>{t("loginTagline")}</Text>
+              {action("continueGoogle", "setup")}
+              <Text style={s.body}>{t("authOr")}</Text>
+              <Text style={s.body}>{t("identityAdvice")}</Text>
+            </>
+          )}
           {field("phone", "+91")}
           <Text style={s.body}>{t("phoneHint")}</Text>
           {screen === "otp" && (

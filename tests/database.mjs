@@ -1,4 +1,5 @@
 import { testCreditsV2 } from "./credits-v2.mjs";
+import { testDualAuth } from "./dual-auth-db.mjs";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
@@ -26,6 +27,7 @@ for (const file of [
   "202609100002_workspaces_worker_discovery.sql",
   "202609130001_test_payments.sql",
   "202609140001_credit_entitlements_v2.sql",
+  "202609150001_sms_hook_guard.sql",
 ]) {
   if (file === "202609140001_credit_entitlements_v2.sql") {
     await pg.exec(
@@ -1063,6 +1065,7 @@ await check(
   },
 );
 await testCreditsV2({ pg, check, asUser, rpc, input });
+await testDualAuth({ pg, check, asUser, rpc });
 console.log(
   `${checks} database integration scenarios passed. Real PostGIS; mocked Auth identity and cron registration only.`,
 );

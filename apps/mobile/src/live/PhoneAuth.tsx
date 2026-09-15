@@ -6,9 +6,13 @@ import { Button, styles as s, colors } from "./ui";
 export default function PhoneAuth({
   t,
   onVerified,
+  service = authService,
+  verification = false,
 }: {
   t: (key: string) => string;
   onVerified: () => void;
+  service?: Pick<typeof authService, "send" | "verify" | "remaining">;
+  verification?: boolean;
 }) {
   const [phone, setPhone] = useState("");
   const [sent, setSent] = useState("");
@@ -16,12 +20,12 @@ export default function PhoneAuth({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [remaining, setRemaining] = useState(authService.remaining());
+  const [remaining, setRemaining] = useState(service.remaining());
   const pending = useRef(false);
   useEffect(() => {
-    const id = setInterval(() => setRemaining(authService.remaining()), 500);
+    const id = setInterval(() => setRemaining(service.remaining()), 500);
     return () => clearInterval(id);
-  }, []);
+  }, [service]);
   async function perform(verify: boolean) {
     if (pending.current) return;
     pending.current = true;
@@ -30,11 +34,11 @@ export default function PhoneAuth({
     setNotice("");
     try {
       if (verify) {
-        await authService.verify(sent, otp);
+        await service.verify(sent, otp);
         setOtp("");
         onVerified();
       } else {
-        const number = await authService.send(sent || phone);
+        const number = await service.send(sent || phone);
         setSent(number);
         setOtp("");
         setNotice("otpSent");
@@ -45,12 +49,12 @@ export default function PhoneAuth({
     } finally {
       pending.current = false;
       setBusy(false);
-      setRemaining(authService.remaining());
+      setRemaining(service.remaining());
     }
   }
   return (
     <>
-      <Text style={s.title}>{t("login")}</Text>
+      <Text style={s.heading}>{t(verification ? "phoneVerification" : "continuePhone")}</Text>
       <Text style={s.label}>{t("phone")}</Text>
       <TextInput
         accessibilityLabel={t("phone")}
@@ -98,6 +102,7 @@ export default function PhoneAuth({
       )}
       <Button
         title={remaining ? `${t("resend")} · ${remaining}s` : t(sent ? "resend" : "sendOtp")}
+        secondary={!verification}
         disabled={busy || remaining > 0}
         onPress={() => void perform(false)}
       />

@@ -19,6 +19,7 @@
     "expo-secure-store": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.3",
+    "expo-web-browser": "~57.0.3",
     "libphonenumber-js": "^1.13.12",
     "maplibre-gl": "^6.7.0",
     "react": "19.2.3",
@@ -42,7 +43,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/marketplace.test.ts src/live/auth-logic.test.ts src/live/location-logic.test.ts src/live/radius-logic.test.ts src/live/credit-query.test.ts src/live/map-presentation.test.ts src/live/workspace.test.ts",
+    "test": "node --experimental-strip-types --test src/marketplace.test.ts src/live/auth-logic.test.ts src/live/location-logic.test.ts src/live/radius-logic.test.ts src/live/credit-query.test.ts src/live/map-presentation.test.ts src/live/workspace.test.ts src/live/dual-auth.test.ts",
     "build:web": "expo export --platform web"
   },
   "private": true,

@@ -17,7 +17,8 @@ export const routeLabel = (route: string) =>
     }) as Record<string, string>
   )[route] || route;
 export function backDestination(route: string, mode: Workspace): string | null {
-  if (["editProfile", "credits", "settings", "preferences"].includes(route)) return "profile";
+  if (["editProfile", "credits", "settings", "preferences", "loginSecurity"].includes(route))
+    return "profile";
   if (route === "post") return "workers";
   return route === workspaceHome(mode) ? null : workspaceHome(mode);
 }
