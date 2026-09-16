@@ -1,11 +1,7 @@
 param([string]$SecretsDirectory = 'C:\PROJECTS\NEARHIRE-SECRETS')
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
-$mapFile = Join-Path $SecretsDirectory 'maptiler-client.env'
-$match = [regex]::Match([IO.File]::ReadAllText($mapFile), '(?m)^MAPTILER_API_KEY\s*=\s*([^\r\n]+)')
-if (-not $match.Success) { throw 'External MapTiler development configuration is missing.' }
-$mapClientKey = $match.Groups[1].Value.Trim().Trim('"').Trim("'")
-$env:EXPO_PUBLIC_MAP_STYLE_URL = 'https://api.maptiler.com/maps/streets-v4/style.json?key=' + [Uri]::EscapeDataString($mapClientKey)
+# Keyless OpenFreeMap default; no external basemap credentials required.
 $env:GOOGLE_SERVICES_JSON = Join-Path $SecretsDirectory 'google-services.json'
 $env:EXPO_PUBLIC_DEMO_MODE = 'false'
 $env:EXPO_PUBLIC_UI_PREVIEW = 'false'

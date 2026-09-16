@@ -113,6 +113,9 @@ export default function JobMap({
           </Marker>
         ))}
       </Map>
+      <Text style={{ fontSize: 10, color: "#333", backgroundColor: "white", textAlign: "center" }}>
+        {configuredMapProvider().attribution}
+      </Text>
     </View>
   );
 }

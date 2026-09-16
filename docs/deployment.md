@@ -1,3 +1,5 @@
+> Current basemap: keyless OpenFreeMap. See [open map architecture](open-map-architecture.md). Historical credential instructions below are superseded; EXPO_PUBLIC_MAP_STYLE_URL is no longer consumed.
+
 # Deployment runbook
 
 Do not launch to real users until the readiness report's release blockers are closed. Never place server secrets in an EXPO_PUBLIC or NEXT_PUBLIC variable.
@@ -37,7 +39,9 @@ Create `apps/mobile/.env` with the public project URL/key, optional tile style U
 EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
 EXPO_PUBLIC_DEMO_MODE=false
-EXPO_PUBLIC_MAP_STYLE_URL=https://YOUR_LICENSED_PROVIDER/style.json
+# OpenFreeMap is the keyless default. Optional self-hosted overrides:
+EXPO_PUBLIC_BASEMAP_STYLE_URL=
+EXPO_PUBLIC_BASEMAP_ATTRIBUTION=
 EXPO_PUBLIC_PRIVACY_POLICY_URL=https://YOUR_DOMAIN/privacy
 ```
 

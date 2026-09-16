@@ -1,3 +1,5 @@
+> Current basemap: keyless OpenFreeMap. See [open map architecture](open-map-architecture.md). Historical credential instructions below are superseded; EXPO_PUBLIC_MAP_STYLE_URL is no longer consumed.
+
 # NearHire Task 3A release configuration
 
 Verified 9 September 2026. This status supersedes earlier EAS setup notes in location-and-notifications.md.
@@ -23,7 +25,7 @@ GOOGLE_SERVICES_JSON is a secret File environment variable sourced from C:\PROJE
 
 PUBLIC MAP STYLE CREDENTIAL REQUIRED
 
-Supply a production-licensed HTTPS MapLibre style URL with a dedicated public/client-safe credential where required. Validate style JSON, tile/glyph/sprite access and attribution, then configure EXPO_PUBLIC_MAP_STYLE_URL in EAS development and the local ignored environment. No demo style or private Ola Places key may be substituted.
+OpenFreeMap is the keyless default. Validate style, tile, glyph, sprite and attribution availability. No EAS basemap key or legacy EXPO_PUBLIC_MAP_STYLE_URL is required. Never substitute a private Ola Places key.
 
 ## Ola development provider
 

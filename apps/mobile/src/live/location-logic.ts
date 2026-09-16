@@ -77,9 +77,27 @@ export async function boundedLocation<T>(p: Promise<T>, ms = 15000): Promise<T> 
     if (timer) clearTimeout(timer);
   }
 }
-export interface MapProvider {
-  styleURL: string | null;
+/** Basemap only: business data stays in PostGIS. */
+export interface MapProviderConfig {
+  styleURL: string;
+  providerName: string;
+  attribution: string;
 }
-export function configuredMapProvider(): MapProvider {
-  return { styleURL: mapStyleUrl(process.env.EXPO_PUBLIC_MAP_STYLE_URL) };
+export const OPEN_MAP: MapProviderConfig = {
+  styleURL: "https://tiles.openfreemap.org/styles/liberty",
+  providerName: "OpenFreeMap",
+  attribution: "OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors",
+};
+export function resolveMapProvider(style?: string, attribution?: string): MapProviderConfig {
+  const url = mapStyleUrl(style);
+  if (!url || !attribution?.trim()) return OPEN_MAP;
+  const host = new URL(url).hostname;
+  if (/(^|\.)(maptiler\.com|openstreetmap\.org)$/.test(host)) return OPEN_MAP;
+  return { styleURL: url, providerName: "Custom basemap", attribution: attribution.trim() };
+}
+export function configuredMapProvider(): MapProviderConfig {
+  return resolveMapProvider(
+    process.env.EXPO_PUBLIC_BASEMAP_STYLE_URL,
+    process.env.EXPO_PUBLIC_BASEMAP_ATTRIBUTION,
+  );
 }

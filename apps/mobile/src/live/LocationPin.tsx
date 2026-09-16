@@ -64,6 +64,11 @@ export default function LocationPin({ position, onMove, t, zoom = 15, fill = fal
             />
           </ViewAnnotation>
         </Map>
+        <Text
+          style={{ fontSize: 10, color: "#333", backgroundColor: "white", textAlign: "center" }}
+        >
+          {configuredMapProvider().attribution}
+        </Text>
       </View>
       {!fill && <Text style={s.body}>{t("movePin")}</Text>}
     </>

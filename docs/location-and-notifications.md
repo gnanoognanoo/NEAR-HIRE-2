@@ -1,3 +1,5 @@
+> Current basemap: keyless OpenFreeMap. See [open map architecture](open-map-architecture.md). Historical credential instructions below are superseded; EXPO_PUBLIC_MAP_STYLE_URL is no longer consumed.
+
 > Current EAS linkage and build status: [Task 3A release configuration](release-configuration.md). Earlier setup observations below are historical.
 
 # Task 3 — Location and notifications
@@ -14,7 +16,7 @@ Files: apps/mobile/src/live/LocationPicker.tsx, LocationPin.tsx/.web.tsx, locati
 
 ## Map and geocoding setup
 
-MapProvider resolves EXPO_PUBLIC_MAP_STYLE_URL to a licensed HTTPS MapLibre style. There is no production demo tile fallback; known MapLibre demo hosts and non-HTTPS styles are rejected. Configure the style/tiles provider account, public restricted key where needed, style URL and required attribution. The renderer retains provider attribution controls. Style URLs are public application configuration, never a place for private credentials. MapLibre handles rendering; no UI component calls Ola directly.
+MapProviderConfig defaults to keyless OpenFreeMap. Optional self-hosted HTTPS styles require EXPO_PUBLIC_BASEMAP_STYLE_URL and EXPO_PUBLIC_BASEMAP_ATTRIBUTION. No basemap account or API key is needed. The renderer retains provider attribution controls. Style URLs are public application configuration, never a place for private credentials. MapLibre handles rendering; no UI component calls Ola directly.
 
 LocationSearchProvider exposes search, resolve and reverse. OlaMapsProvider uses authenticated Edge requests to autocomplete, place details and reverse-geocode, normalizes locality/city/district/state/country/address, and bounds provider requests to 10 seconds. MockLocationProvider is only instantiated explicitly by tests; the hosted endpoint will not select it. GPS plus manual real coordinates/locality remains the development fallback without keys.
 
@@ -126,7 +128,7 @@ npx eas-cli login
 npx eas-cli env:set development --name GOOGLE_SERVICES_JSON --type file --visibility secret --value "C:\PROJECTS\NEARHIRE-SECRETS\google-services.json" --scope project --non-interactive
 ```
 
-Configure EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY and the dedicated public EXPO_PUBLIC_MAP_STYLE_URL in the same development environment. Server credentials must never be supplied to EAS or EXPO_PUBLIC variables. See [EAS environment variables](https://docs.expo.dev/eas/environment-variables/).
+Configure EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY with the keyless default basemap in the same development environment. Server credentials must never be supplied to EAS or EXPO_PUBLIC variables. See [EAS environment variables](https://docs.expo.dev/eas/environment-variables/).
 
 OLA_MAPS_API_KEY and a dedicated public map style remain unavailable. The earlier screenshot contains server-side API/OAuth credentials; rotate those exposed credentials and supply the replacement securely. Do not use the private Places key for mobile tiles.
 

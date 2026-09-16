@@ -35,6 +35,13 @@ export default function JobMap({
       map = new maplibregl.Map({
         container: ref.current,
         style,
+        attributionControl: {
+          compact: false,
+          customAttribution:
+            configuredMapProvider().providerName === "OpenFreeMap"
+              ? undefined
+              : configuredMapProvider().attribution,
+        },
         center: [initial.current.longitude, initial.current.latitude],
         zoom: 13,
       });

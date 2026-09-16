@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  configuredMapProvider,
+  resolveMapProvider,
+  OPEN_MAP,
   coordinates,
   activeNearby,
   mapStyleUrl,
@@ -56,4 +59,25 @@ test("GPS acquisition timeout and permanent denial have recoverable messages", a
   assert.equal(await boundedLocation(Promise.resolve("gps"), 50), "gps");
   assert.equal(locationErrorKey(new Error("LOCATION_PERMISSION_PERMANENT")), "locationPermanent");
   assert.equal(locationErrorKey(new Error("GPS_DISABLED")), "gpsDisabled");
+});
+
+test("default is keyless OpenFreeMap with data attribution", () => {
+  assert.deepEqual(configuredMapProvider(), OPEN_MAP);
+  assert.equal(new URL(OPEN_MAP.styleURL).search, "");
+  for (const name of ["OpenFreeMap", "OpenMapTiles", "OpenStreetMap"])
+    assert.ok(OPEN_MAP.attribution.includes(name));
+});
+test("custom hosting requires HTTPS and attribution; paid and OSM public hosts rejected", () => {
+  for (const url of [
+    undefined,
+    "http://maps.example/style",
+    "https://tile.openstreetmap.org/style",
+    "https://api.maptiler.com/style",
+  ])
+    assert.equal(resolveMapProvider(url, "Data attribution"), OPEN_MAP);
+  assert.equal(resolveMapProvider("https://maps.example/style"), OPEN_MAP);
+  assert.equal(
+    resolveMapProvider("https://maps.example/style", "OSM").styleURL,
+    "https://maps.example/style",
+  );
 });

@@ -1,18 +1,20 @@
+> Current basemap: keyless OpenFreeMap. See [open map architecture](open-map-architecture.md). Historical credential instructions below are superseded; EXPO_PUBLIC_MAP_STYLE_URL is no longer consumed.
+
 # NearHire development UI review
 
 APK build is paused until explicit UI approval. Open http://localhost:8093.
 
-The 25-screen development gallery uses shared live controls and translations with presentation fixtures. It never imports auth/services, creates sessions, writes backend records or changes credits. Only MapTiler map assets are requested externally. The Developer info panel explains fixtures and switches between 5 and 0 credits. Release exports exclude the gallery; production navigation stays separate.
+The 25-screen development gallery uses shared live controls and translations with presentation fixtures. It never imports auth/services, creates sessions, writes backend records or changes credits. Only OpenFreeMap map assets are requested externally. The Developer info panel explains fixtures and switches between 5 and 0 credits. Release exports exclude the gallery; production navigation stays separate.
 
 ## Starting the preview
 
-From apps/mobile, set EXPO_PUBLIC_UI_PREVIEW=true and EXPO_PUBLIC_DEMO_MODE=false in the current shell. Load EXPO_PUBLIC_MAP_STYLE_URL from the external client configuration, then run:
+From apps/mobile, set EXPO_PUBLIC_UI_PREVIEW=true and EXPO_PUBLIC_DEMO_MODE=false in the current shell. No basemap credentials are needed. Run:
 
 ```powershell
 npx expo start --web --port 8093 --localhost
 ```
 
-The current launcher reads C:\PROJECTS\NEARHIRE-SECRETS\maptiler-client.env without displaying its key. The key is a temporary development client credential and must be rotated/restricted before production. Never copy credentials into committed source. No EAS build or new Expo project is needed for review.
+No external map credential file is needed. Existing external credentials are preserved.
 
 ## Web map
 
@@ -34,7 +36,7 @@ Purchasing is hidden by default. EXPO_PUBLIC_PAYMENTS_ENABLED=true is only an op
 
 Run npm run check, npm run lint, npm test, and npm --prefix apps/mobile run build:web from the root. The browser test is node --test tests/ui-preview.cjs with Playwright installed/resolvable (NODE_PATH can point to a tooling installation), Edge installed and the preview running. PREVIEW_URL can override the URL.
 
-Tests cover all screens in English/Tamil, 5/0 balances, one-credit confirmation copy, 360/390/412px overflow, hidden coordinate inputs, real map loading/marker/pin interactions, explicit map failure and no backend HTTP requests. Provider resources are allowed only from api.maptiler.com. A production export also includes locally hosted worker assets. Browser map validation does not establish native GPS/MapLibre/FCM success.
+Tests cover all screens in English/Tamil, 5/0 balances, one-credit confirmation copy, 360/390/412px overflow, hidden coordinate inputs, real map loading/marker/pin interactions, explicit map failure and no backend HTTP requests. Provider resources are allowed only from tiles.openfreemap.org. A production export also includes locally hosted worker assets. Browser map validation does not establish native GPS/MapLibre/FCM success.
 
 ## September 10 refinement: custom distance and Profile wallet
 
@@ -63,7 +65,7 @@ Location selection has its own full map, pin, search/GPS controls and locality/p
 
 Validation passed: mobile/admin TypeScript, ESLint, 20 mobile/unit tests, 2 localization tests, 3 browser tests and production web export. Browser tests cover all 25 gallery screens, English/Tamil, 360/390/412px widths, map height, semantic/selected pins, filtering, radius persistence, map/list, recenter, credits and failure/retry. Production export excludes the DEV gallery. This map-layout pass does not modify database code; prior PostGIS verification is documented above.
 
-Preview: http://localhost:8093. Command: npx expo start --web --port 8093 --localhost, with DEV preview flag and external MapTiler client configuration. Hot reload is active. Clustering and native rendering/GPS/device safe-area verification remain deferred. No APK built; wait for UI APPROVED — BUILD APK.
+Preview: http://localhost:8093. Command: npx expo start --web --port 8093 --localhost, with DEV preview flag and keyless OpenFreeMap defaults. Hot reload is active. Clustering and native rendering/GPS/device safe-area verification remain deferred. No APK built; wait for UI APPROVED — BUILD APK.
 
 ## Two workspaces — September 10, 2026
 

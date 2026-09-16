@@ -22,6 +22,13 @@ export default function LocationPin({ position, onMove, t, zoom = 15, fill = fal
       map = new maplibregl.Map({
         container: ref.current,
         style,
+        attributionControl: {
+          compact: false,
+          customAttribution:
+            configuredMapProvider().providerName === "OpenFreeMap"
+              ? undefined
+              : configuredMapProvider().attribution,
+        },
         center: [position.longitude, position.latitude],
         zoom,
       });

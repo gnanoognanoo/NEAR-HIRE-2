@@ -1,3 +1,5 @@
+> Current basemap: keyless OpenFreeMap. See [open map architecture](open-map-architecture.md). Historical credential instructions below are superseded; EXPO_PUBLIC_MAP_STYLE_URL is no longer consumed.
+
  NearHire Android development test checklist
 
 Status: PENDING. No APK or physical-device result has been verified.
@@ -5,7 +7,7 @@ Status: PENDING. No APK or physical-device result has been verified.
 ## Build prerequisites
 
 - Existing Expo account authenticated and existing NearHire EAS project linked; no duplicate project.
-- EAS development environment: GOOGLE_SERVICES_JSON is a File variable using the external Android config; public Supabase URL/anon key; EXPO_PUBLIC_DEMO_MODE=false; production-licensed EXPO_PUBLIC_MAP_STYLE_URL.
+- EAS development environment: GOOGLE_SERVICES_JSON is a File variable using the external Android config; public Supabase URL/anon key; EXPO_PUBLIC_DEMO_MODE=false; keyless OpenFreeMap default (no map environment variable required).
 - Firebase service account remains outside Git and EAS. Firebase server credentials stay in Supabase.
 - Dedicated public map style validated for HTTPS, style JSON, tile/glyph/sprite access, licensing and attribution. No demo style or private Ola key in mobile.
 - Replacement Ola server credential configured only in Supabase for provider tests.
