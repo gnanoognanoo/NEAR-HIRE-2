@@ -62,7 +62,6 @@ export default function JobMap({
               : {}
           }
         >
-          {" "}
           {failed && <Text style={styles.body}>{t("mapFailed")}</Text>}
           {failed && (
             <Button

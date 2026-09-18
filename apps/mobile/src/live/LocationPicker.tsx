@@ -118,7 +118,6 @@ export default function LocationPicker({
         }}
       >
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
-          {" "}
           {error === "locationPermanent" && (
             <Button
               title={t("openSettings")}
@@ -194,7 +193,7 @@ export default function LocationPicker({
             contentContainerStyle={s.content}
             keyboardShouldPersistTaps="handled"
           >
-            <Button title={t("close")} secondary onPress={() => setSheet(false)} />{" "}
+            <Button title={t("close")} secondary onPress={() => setSheet(false)} />
             {__DEV__ && (
               <Button
                 title={t("developerInfo")}

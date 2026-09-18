@@ -138,7 +138,6 @@ export default function JobMap({
               : {}
           }
         >
-          {" "}
           {(!style || failed) && (
             <Text style={styles.body}>{failed ? t("mapFailed") : unavailable}</Text>
           )}
