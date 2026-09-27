@@ -34,7 +34,8 @@
           "locationWhenInUsePermission": "NearHire uses your location to show nearby jobs and workers."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "extra": {
       "eas": {
