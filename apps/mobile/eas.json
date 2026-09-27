@@ -21,6 +21,14 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "developmentClient": false,
+      "environment": "preview",
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_DEMO_MODE": "false",
+        "EXPO_PUBLIC_UI_PREVIEW": "false",
+        "EXPO_PUBLIC_PAYMENT_TEST_AUTH": "false"
       }
     },
     "production": {
@@ -30,7 +38,8 @@
       },
       "env": {
         "EXPO_PUBLIC_DEMO_MODE": "false"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {

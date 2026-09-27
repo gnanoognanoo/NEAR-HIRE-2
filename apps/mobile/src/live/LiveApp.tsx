@@ -1,3 +1,4 @@
+import AboutNearHire from "./AboutNearHire";
 import CreditBreakdown from "./CreditBreakdown";
 import { creditReasonKey } from "./credit-model";
 import PaymentPackages from "./PaymentPackages";
@@ -453,6 +454,7 @@ export default function LiveApp() {
       {screen === "settings" && (
         <>
           <Text style={s.title}>{t("settings")}</Text>
+          <AboutNearHire t={t} />
           <Button title={t("loginSecurity")} secondary onPress={() => setScreen("loginSecurity")} />
           <View style={s.row}>
             <Choice

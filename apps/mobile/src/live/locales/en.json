@@ -351,5 +351,13 @@
   "identityConflict": "This sign-in method belongs to another account, or your session changed. Sign in to your original account. Accounts cannot be merged here.",
   "linkingUnavailable": "Account linking is not available yet. Please try again later.",
   "identityAdvice": "Already have a NearHire account? Sign in using your existing method, then link another method here to keep your wallet and history.",
-  "googleUnavailable": "Google sign-in is temporarily unavailable. Please try again later."
+  "googleUnavailable": "Google sign-in is temporarily unavailable. Please try again later.",
+  "aboutNearHire": "About NearHire",
+  "appVersion": "Version",
+  "appBuild": "Build",
+  "appRuntime": "Runtime",
+  "appChannel": "Channel",
+  "appUpdate": "Update",
+  "embeddedUpdate": "Included in APK",
+  "updatesNextRestart": "Compatible updates download on launch and apply the next time you restart NearHire."
 }
