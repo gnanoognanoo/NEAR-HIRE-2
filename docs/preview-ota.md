@@ -1,14 +1,14 @@
 # Friend testing and OTA updates
 
-The preview profile builds a standalone internally distributed Android APK for app.nearhire.mobile. It uses the existing EAS project and the preview environment/channel. Development remains a dev-client workflow. Production uses its own production channel and is not published by this workflow.
+The preview profile builds a standalone internally distributed Android APK for app.nearhire.mobile.preview (NearHire Preview). It uses the existing EAS project and the preview environment/channel. Development remains a dev-client workflow. Production uses its own production channel and is not published by this workflow.
 
-Testers install the APK once; Metro, Expo Go and developer tools are not required. Because the package remains unchanged, installing preview replaces an installed development build on the same device. The development profile and existing artifact remain available.
+Testers install the APK once; Metro, Expo Go and developer tools are not required. Preview and development install side by side. Development remains app.nearhire.mobile and nearhire://auth/callback; preview uses nearhire-preview://auth/callback. Browser Google OAuth still uses the existing Supabase Web OAuth client, not a native Google sign-in SDK.
 
 Expo checks for compatible updates on launch, downloads in the background and applies on the next cold restart. It never reloads an active workflow. Settings → About NearHire shows version, native build, runtime, channel and update ID.
 
 ## Publishing
 
-From apps/mobile, with the same preview environment and Firebase configuration used by the binary:
+From apps/mobile, with APP_VARIANT=preview and the same preview environment and Firebase configuration used by the binary:
 
 ```sh
 npx eas-cli build --platform android --profile preview

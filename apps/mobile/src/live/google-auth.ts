@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { Linking, Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { backend, storage } from "./client";
@@ -6,7 +7,7 @@ const PENDING = "nearhire.oauth.pending";
 let active = false;
 let completing: Promise<void> | null = null;
 const redirect = () =>
-  Platform.OS === "web" ? window.location.origin + "/" : "nearhire://auth/callback";
+  Platform.OS === "web" ? window.location.origin + "/" : (Constants.expoConfig?.scheme === "nearhire-preview" ? "nearhire-preview://auth/callback" : "nearhire://auth/callback");
 
 export async function clearPendingOAuth() {
   await storage.removeItem(PENDING);
