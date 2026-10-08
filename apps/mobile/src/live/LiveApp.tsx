@@ -32,6 +32,7 @@ import { profileComplete, restoredSession, authErrorKey, withAuthTimeout } from 
 import React, { useEffect, useState, useRef, createContext, useContext } from "react";
 import {
   Platform,
+  AppState,
   ActivityIndicator,
   BackHandler,
   Linking,
@@ -51,8 +52,9 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
-import { db, configured, edge, rpc } from "./client";
-import { openCheckout } from "./checkout";
+import { db, configured, rpc } from "./client";
+import { paymentFlow } from "./payment-service";
+import { testPaymentsAllowed } from "./payment-flow";
 import {
   applicationService,
   authService,
@@ -188,6 +190,25 @@ export default function LiveApp() {
     const sub = notificationService.subscribeRefresh();
     return () => sub.remove();
   }, [session]);
+  useEffect(() => {
+    if (!session?.user.id) return;
+    let alive = true;
+    const recover = async () => {
+      const result = await paymentFlow.recover();
+      if (alive && result === "paymentSuccess") {
+        await qc.invalidateQueries({ queryKey: creditBalanceKey });
+        await qc.invalidateQueries({ queryKey: ["creditHistory"] });
+      }
+    };
+    void recover();
+    const listener = AppState.addEventListener("change", (next) => {
+      if (next === "active") void recover();
+    });
+    return () => {
+      alive = false;
+      listener.remove();
+    };
+  }, [session?.user.id, qc]);
   const profile = useQuery({
     queryKey: ["profile", session?.user.id],
     queryFn: profileService.get,
@@ -762,7 +783,10 @@ function Jobs({
       loadMoreRef.current = () => {};
     };
   }, [loadMoreRef, results]);
-  const visibleJobs = activeNearby(results.data?.pages.flat() || [], now);
+  const visibleJobs = activeNearby(
+    results.isPlaceholderData || results.isError ? [] : results.data?.pages.flat() || [],
+    now,
+  );
   useEffect(() => {
     if (selected && Date.parse(selected.expires_at) <= now) setSelected(null);
   }, [selected, now]);
@@ -1701,7 +1725,8 @@ function Credits({ t }: { t: Translate }) {
   const busyRef = useRef(false);
   const [selected, setSelected] = useState("");
   const [state, setState] = useState("");
-  const [providerOrder, setProviderOrder] = useState("");
+  const mounted = useRef(true);
+  const recovery = useRef(false);
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
   const q = useQuery({
@@ -1728,7 +1753,7 @@ function Credits({ t }: { t: Translate }) {
     queryFn: async () => {
       const { data, error } = await db!
         .from("payment_config")
-        .select("payments_enabled_test")
+        .select("payments_enabled_test,live_enabled")
         .single();
       if (error) throw error;
       return data;
@@ -1738,72 +1763,58 @@ function Credits({ t }: { t: Translate }) {
     await qc.invalidateQueries({ queryKey: creditBalanceKey });
     await qc.invalidateQueries({ queryKey: ["creditHistory"] });
   };
+  const resume = async () => {
+    if (busyRef.current || recovery.current) return;
+    recovery.current = true;
+    try {
+      const result = await paymentFlow.recover();
+      if (mounted.current && result) setState(result);
+      if (result === "paymentSuccess") await refresh();
+    } finally {
+      recovery.current = false;
+    }
+  };
   useEffect(() => {
-    if (!providerOrder || state !== "paymentVerifying") return;
-    let alive = true;
-    const timer = setInterval(() => {
-      void db!
-        .from("payment_orders")
-        .select("status")
-        .eq("provider_order_id", providerOrder)
-        .single()
-        .then(({ data }) => {
-          if (alive && data?.status === "paid") {
-            setState("paymentSuccess");
-            void qc.invalidateQueries({ queryKey: creditBalanceKey });
-            void qc.invalidateQueries({ queryKey: ["creditHistory"] });
-          }
-        });
-    }, 5000);
+    mounted.current = true;
+    void resume();
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active") void resume();
+    });
     return () => {
-      alive = false;
-      clearInterval(timer);
+      mounted.current = false;
+      subscription.remove();
     };
-  }, [providerOrder, state, qc]);
+  }, []);
+  useEffect(() => {
+    if (state !== "paymentPending" && state !== "paymentVerifying") return;
+    let attempts = 0;
+    const timer = setInterval(() => {
+      if (++attempts > 12) {
+        clearInterval(timer);
+        return;
+      }
+      void resume();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [state]);
   const buy = async () => {
-    if (busyRef.current || !selected) return;
+    if (busyRef.current || recovery.current || !selected || !testPaymentsAllowed(config.data))
+      return;
     if (Platform.OS === "web") {
       setState("nativePaymentRequired");
       return;
     }
     busyRef.current = true;
     setBusy(true);
-    setState("creatingOrder");
     try {
-      const {
-        data: { user },
-      } = await db!.auth.getUser();
-      if (!user) throw new Error("AUTH_REQUIRED");
-      const key = `nearhire.payment.${user.id}.${selected}`;
-      let requestId = await AsyncStorage.getItem(key);
-      if (!requestId) {
-        requestId = Crypto.randomUUID();
-        await AsyncStorage.setItem(key, requestId);
-      }
-      const order = await edge("payment-order", { package_id: selected, request_id: requestId });
-      if (order.status === "paid") {
-        await AsyncStorage.removeItem(key);
-        await refresh();
-        setState("paymentSuccess");
-        return;
-      }
-      setProviderOrder(order.order_id);
-      setState("openingCheckout");
-      const result = await openCheckout(order);
-      setState("paymentVerifying");
-      const verified = await edge("payment-verify", { ...result });
-      if (verified.status === "paid") {
-        await AsyncStorage.removeItem(key);
-        setState("paymentSuccess");
-      } else setState("paymentVerifying");
-      await refresh();
-    } catch (e) {
-      const error = e as { code?: number; message?: string };
-      setState(error.code === 2 ? "paymentCancelled" : "paymentFailed");
+      const result = await paymentFlow.buy(selected, (step) => {
+        if (mounted.current) setState(step);
+      });
+      if (mounted.current) setState(result);
       await refresh();
     } finally {
       busyRef.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
   return (
@@ -1824,13 +1835,19 @@ function Credits({ t }: { t: Translate }) {
           disabled={busy}
         />
       )}
-      {(config.isError || config.data?.payments_enabled_test !== true) && (
+      {(config.isError || !testPaymentsAllowed(config.data)) && (
         <Text style={s.body}>{t("paymentUnavailable")}</Text>
       )}
       <Button
         title={t("continuePayment")}
-        disabled={busy || !selected || config.data?.payments_enabled_test !== true}
+        disabled={busy || !selected || !testPaymentsAllowed(config.data)}
         onPress={() => void buy()}
+      />
+      <Button
+        title={t("checkPaymentStatus")}
+        secondary
+        disabled={busy}
+        onPress={() => void resume()}
       />
       {!!state && (
         <Text accessibilityLiveRegion="polite" style={s.notice}>

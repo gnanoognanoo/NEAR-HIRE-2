@@ -168,7 +168,7 @@
   "permissionTitle": "Find work nearby",
   "selectedLocation": "Selected location",
   "noLocation": "Choose a location to discover nearby work.",
-  "paymentPending": "Payment setup is pending.",
+  "paymentPending": "Payment confirmation is pending. Check status before paying again.",
   "accountActive": "Resolve accepted or ongoing work before deleting your account.",
   "minPay": "Minimum pay (₹)",
   "startDate": "Start date (YYYY-MM-DD, optional)",
@@ -359,5 +359,9 @@
   "appChannel": "Channel",
   "appUpdate": "Update",
   "embeddedUpdate": "Included in APK",
-  "updatesNextRestart": "Compatible updates download on launch and apply the next time you restart NearHire."
+  "updatesNextRestart": "Compatible updates download on launch and apply the next time you restart NearHire.",
+  "cachedLocation": "Recent saved location — retry for a fresh fix",
+  "cachedApproximateLocation": "Recent approximate location — retry for a fresh fix",
+  "approximateLocation": "Approximate device location",
+  "checkPaymentStatus": "Check payment status"
 }

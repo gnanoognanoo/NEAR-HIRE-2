@@ -36,7 +36,7 @@ export default function NearbyWorkers({
   });
   return (
     <WorkerSurface
-      workers={q.data?.pages.flat() || []}
+      workers={q.isPlaceholderData || q.isError ? [] : q.data?.pages.flat() || []}
       position={position}
       radius={radius}
       onRadius={setRadius}

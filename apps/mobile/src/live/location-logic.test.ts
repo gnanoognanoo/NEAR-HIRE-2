@@ -81,3 +81,5 @@ test("custom hosting requires HTTPS and attribution; paid and OSM public hosts r
     "https://maps.example/style",
   );
 });
+
+import "./location-acquisition.test.ts";

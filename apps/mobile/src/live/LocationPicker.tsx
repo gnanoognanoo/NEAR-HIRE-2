@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Modal, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, Modal, ScrollView, Text, View } from "react-native";
 import { Button, Field, styles as s, colors } from "./ui";
 import { locationService, type Place } from "./services";
-import { coordinates, locationErrorKey, type Position } from "./location-logic";
+import { boundedLocation, coordinates, locationErrorKey, type Position } from "./location-logic";
+import { locationStatus } from "./location-acquisition";
+import CurrentLocationControl from "./CurrentLocationControl";
 import LocationPin from "./LocationPin";
 export default function LocationPicker({
   t,
@@ -64,7 +66,7 @@ export default function LocationPicker({
   }, [query, retry]);
   async function select(p: Position, reverse = true) {
     const rev = ++revision.current;
-    setPoint(p);
+    setPoint({ ...p, source: p.source || "manual" });
     setLat(String(p.latitude));
     setLng(String(p.longitude));
     setLocality(p.locality || "");
@@ -73,9 +75,9 @@ export default function LocationPicker({
     if (!reverse) return;
     setBusy(true);
     try {
-      const place = await locationService.reverse(p.latitude, p.longitude);
+      const place = await boundedLocation(locationService.reverse(p.latitude, p.longitude), 5000);
       if (rev === revision.current) {
-        setPoint({ ...place, ...coordinates(p.latitude, p.longitude) });
+        setPoint({ ...place, ...p });
         setLocality(place.locality || "");
         setAddress(place.formatted_address || "");
       }
@@ -118,11 +120,17 @@ export default function LocationPicker({
         }}
       >
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
-          {error === "locationPermanent" && (
+          {(error === "locationPermanent" || error === "gpsDisabled") && Platform.OS !== "web" && (
             <Button
               title={t("openSettings")}
               secondary
-              onPress={() => void Linking.openSettings()}
+              onPress={() => {
+                if (error === "gpsDisabled" && Platform.OS === "android")
+                  void Linking.sendIntent("android.settings.LOCATION_SOURCE_SETTINGS").catch(() =>
+                    Linking.openSettings(),
+                  );
+                else void Linking.openSettings();
+              }}
             />
           )}
           <Field label={t("manual")} value={query} onChange={setQuery} />
@@ -168,7 +176,14 @@ export default function LocationPicker({
               }}
             />
           ))}
-          <Button title={t("gps")} disabled={busy} onPress={() => void gps()} />
+          <CurrentLocationControl
+            t={t}
+            onLocated={(p) => void select(p)}
+            onManual={() => {
+              setSheet(true);
+              setDiagnostics(true);
+            }}
+          />
         </ScrollView>
       </View>
       <View
@@ -183,7 +198,16 @@ export default function LocationPicker({
           gap: 8,
         }}
       >
+        {point && <Text style={s.body}>{locationStatus(point, t)}</Text>}
         <Text style={s.body}>{t("movePin")}</Text>
+        <Button
+          title={t("manualCoordinates")}
+          secondary
+          onPress={() => {
+            setSheet(true);
+            setDiagnostics(true);
+          }}
+        />
         <Button title={t("confirmLocation")} disabled={!point} onPress={() => setSheet(true)} />
       </View>
       <Modal visible={sheet} transparent onRequestClose={() => setSheet(false)}>
@@ -194,14 +218,12 @@ export default function LocationPicker({
             keyboardShouldPersistTaps="handled"
           >
             <Button title={t("close")} secondary onPress={() => setSheet(false)} />
-            {__DEV__ && (
-              <Button
-                title={t("developerInfo")}
-                secondary
-                onPress={() => setDiagnostics(!diagnostics)}
-              />
-            )}
-            {__DEV__ && diagnostics && (
+            <Button
+              title={t("manualCoordinates")}
+              secondary
+              onPress={() => setDiagnostics(!diagnostics)}
+            />
+            {diagnostics && (
               <>
                 <Text style={s.body}>{t("manualCoordinates")}</Text>
                 <View style={s.row}>
@@ -214,7 +236,7 @@ export default function LocationPicker({
                   disabled={busy}
                   onPress={() => {
                     try {
-                      void select(coordinates(lat, lng));
+                      void select({ ...coordinates(lat, lng), source: "manual" });
                     } catch (e) {
                       setError(locationErrorKey(e));
                     }

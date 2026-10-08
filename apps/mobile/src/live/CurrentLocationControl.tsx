@@ -3,6 +3,7 @@ import { ActivityIndicator, Linking, Modal, Platform, Pressable, Text, View } fr
 import { Feather } from "@expo/vector-icons";
 import { deviceLocation, needsLocationExplanation } from "./device-location";
 import { locationErrorKey, type Position } from "./location-logic";
+import { locationStatus } from "./location-acquisition";
 import { Button, colors, styles as s } from "./ui";
 export default function CurrentLocationControl({
   t,
@@ -16,7 +17,8 @@ export default function CurrentLocationControl({
   const gate = useRef(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [explain, setExplain] = useState(false);
+    [explain, setExplain] = useState(false),
+    [status, setStatus] = useState("");
   async function locate(confirmed = false) {
     if (gate.current) return;
     gate.current = true;
@@ -28,7 +30,9 @@ export default function CurrentLocationControl({
         return;
       }
       const p = await deviceLocation();
-      onLocated({ ...p, label: t("currentLocation") });
+      const label = locationStatus(p, t);
+      setStatus(label);
+      onLocated({ ...p, label });
     } catch (e) {
       setError(
         (e as Error).message === "LOCATION_UNAVAILABLE"
@@ -41,7 +45,12 @@ export default function CurrentLocationControl({
     }
   }
   return (
-    <View style={{ alignItems: "flex-end", gap: 8, flexShrink:1, minWidth:44 }}>
+    <View style={{ alignItems: "flex-end", gap: 8, flexShrink: 1, minWidth: 44 }}>
+      {!!status && !error && (
+        <Text accessibilityLiveRegion="polite" style={[s.body, { maxWidth: 210 }]}>
+          {status}
+        </Text>
+      )}
       {!!error && (
         <View style={[s.card, { padding: 10, maxWidth: 300, gap: 6 }]}>
           <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={s.body}>
@@ -49,14 +58,28 @@ export default function CurrentLocationControl({
           </Text>
           <View style={s.row}>
             <Button title={t("retry")} secondary onPress={() => void locate()} />
-            {error === "locationPermanent" && Platform.OS !== "web" && (
-              <Button
-                title={t("openSettings")}
-                secondary
-                onPress={() => void Linking.openSettings()}
-              />
-            )}
-            <Button title={t("selectLocation")} secondary onPress={()=>{setError("");onManual();}} />
+            {(error === "locationPermanent" || error === "gpsDisabled") &&
+              Platform.OS !== "web" && (
+                <Button
+                  title={t("openSettings")}
+                  secondary
+                  onPress={() => {
+                    if (error === "gpsDisabled" && Platform.OS === "android")
+                      void Linking.sendIntent("android.settings.LOCATION_SOURCE_SETTINGS").catch(
+                        () => Linking.openSettings(),
+                      );
+                    else void Linking.openSettings();
+                  }}
+                />
+              )}
+            <Button
+              title={t("selectLocation")}
+              secondary
+              onPress={() => {
+                setError("");
+                onManual();
+              }}
+            />
           </View>
         </View>
       )}

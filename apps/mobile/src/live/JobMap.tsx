@@ -1,6 +1,7 @@
 import JobMapMarker from "./JobMapMarker";
 import { MAX_MAP_MARKERS } from "./map-presentation";
-import { configuredMapProvider } from "./location-logic";
+import { locationStatus } from "./location-acquisition";
+import { configuredMapProvider, type Position } from "./location-logic";
 import React, { useState, useRef, useEffect } from "react";
 import { Text, View } from "react-native";
 import { Camera, Map, Marker, type CameraRef } from "@maplibre/maplibre-react-native";
@@ -10,7 +11,7 @@ export type MapProps = {
   fill?: boolean;
   selectedId?: string | null;
   recenterKey?: number;
-  position: { latitude: number; longitude: number };
+  position: Position;
   jobs: any[];
   onSelect: (job: any) => void;
   unavailable: string;
@@ -87,8 +88,16 @@ export default function JobMap({
         <Marker lngLat={[position.longitude, position.latitude]}>
           <View
             accessible
-            accessibilityLabel={t("selectedLocation")}
-            style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.accent }}
+            accessibilityLabel={locationStatus(position, t)}
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: 7,
+              borderWidth: 2,
+              borderColor:
+                position.approximate || position.source === "cached" ? colors.ink : colors.white,
+              backgroundColor: colors.accent,
+            }}
           />
         </Marker>
         {jobs.slice(0, MAX_MAP_MARKERS).map((item) => (

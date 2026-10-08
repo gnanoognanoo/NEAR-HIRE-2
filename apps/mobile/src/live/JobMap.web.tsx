@@ -5,6 +5,7 @@ import { Text, View } from "react-native";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { MapProps } from "./JobMap";
+import { locationStatus } from "./location-acquisition";
 import { configuredMapProvider } from "./location-logic";
 import { Button, styles, colors } from "./ui";
 export default function JobMap({
@@ -91,7 +92,7 @@ export default function JobMap({
         .setLngLat([position.longitude, position.latitude])
         .addTo(map),
     ];
-    next[0].getElement().setAttribute("aria-label", t("selectedLocation"));
+    next[0].getElement().setAttribute("aria-label", locationStatus(position, t));
     for (const item of JSON.parse(jobsKey).slice(0, MAX_MAP_MARKERS)) {
       const el = document.createElement("button");
       const urgent = item.job.isUrgent === true,
@@ -118,7 +119,18 @@ export default function JobMap({
       );
     }
     markers.current = next;
-  }, [jobsKey, position.latitude, position.longitude, style, version, selectedId, markerKind]);
+  }, [
+    jobsKey,
+    position.latitude,
+    position.longitude,
+    position.source,
+    position.approximate,
+    position.accuracy,
+    style,
+    version,
+    selectedId,
+    markerKind,
+  ]);
   return (
     <>
       {(!style || failed) && (

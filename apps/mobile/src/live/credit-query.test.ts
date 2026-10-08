@@ -53,3 +53,5 @@ test("credit expiry presentation uses server time and rounds partial days withou
   assert.equal(expiryDays({ ...s, next_expiry: null }), null);
   assert.equal(expiryDays({ ...s, next_expiry: "2026-09-01T00:00:00Z" }), 0);
 });
+
+import "./payment-flow.test.ts";

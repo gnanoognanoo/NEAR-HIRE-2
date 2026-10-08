@@ -1,3 +1,4 @@
+import { assertTestOrder } from "./payment-flow";
 import RazorpayCheckout from "react-native-razorpay";
 export async function openCheckout(order: {
   key_id: string;
@@ -5,6 +6,7 @@ export async function openCheckout(order: {
   amount: number;
   currency: string;
 }) {
+  assertTestOrder(order);
   return RazorpayCheckout.open({
     key: order.key_id,
     order_id: order.order_id,

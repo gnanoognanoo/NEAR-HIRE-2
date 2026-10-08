@@ -1,6 +1,10 @@
 export type Position = {
   latitude: number;
   longitude: number;
+  source?: "live" | "cached" | "manual";
+  accuracy?: number;
+  timestamp?: number;
+  approximate?: boolean;
   label?: string;
   locality?: string;
   city?: string;
