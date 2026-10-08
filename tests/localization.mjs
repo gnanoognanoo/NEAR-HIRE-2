@@ -20,6 +20,7 @@ test("English and Tamil have matching nonempty translation keys", () => {
 test("literal live-screen translation references exist", () => {
   const source = [
     "LiveApp.tsx",
+    "PostWork.tsx",
     "PhoneAuth.tsx",
     "GoogleButton.tsx",
     "LoginSecurity.tsx",

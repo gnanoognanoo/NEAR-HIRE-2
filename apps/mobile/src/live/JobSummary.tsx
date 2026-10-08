@@ -27,6 +27,12 @@ export default function JobSummary({
       </Text>
       {job.employment_type && <Text style={s.body}>{t(job.employment_type)}</Text>}
       <Text style={s.body}>{job.description}</Text>
+      {(job.is_urgent || job.isUrgent) && <Text style={s.tag}>{t("postingUrgent")}</Text>}
+      {(job.start_date || job.start_time) && (
+        <Text style={s.body}>
+          {job.start_date} {job.start_time}
+        </Text>
+      )}
       {job.schedule && (
         <Text style={s.body}>
           {t("schedule")}: {job.schedule}

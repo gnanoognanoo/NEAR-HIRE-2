@@ -94,12 +94,14 @@ export function Field({
   onChange,
   numeric = false,
   multiline = false,
+  maxLength,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   numeric?: boolean;
   multiline?: boolean;
+  maxLength?: number;
 }) {
   return (
     <View style={{ gap: 8 }}>
@@ -110,7 +112,7 @@ export function Field({
         onChangeText={onChange}
         keyboardType={numeric ? "decimal-pad" : "default"}
         multiline={multiline}
-        maxLength={multiline ? 3000 : 200}
+        maxLength={maxLength ?? (multiline ? 3000 : 200)}
         style={[styles.input, multiline && { minHeight: 110, textAlignVertical: "top" }]}
       />
     </View>

@@ -1,3 +1,4 @@
+import PostWork from "./PostWork";
 import AboutNearHire from "./AboutNearHire";
 import CreditBreakdown from "./CreditBreakdown";
 import { creditReasonKey } from "./credit-model";
@@ -16,12 +17,7 @@ import {
 import { creditBalanceKey } from "./credit-query";
 import DistanceControl from "./DistanceControl";
 import { validateRadiusMetres } from "./radius-logic";
-import {
-  JobCreditBalance,
-  PublishConfirmation,
-  CreditBalanceChip,
-  PublishCost,
-} from "./JobCreditBalance";
+import { JobCreditBalance, PublishConfirmation, CreditBalanceChip } from "./JobCreditBalance";
 import LocationPicker from "./LocationPicker";
 import { activeNearby, type Position } from "./location-logic";
 import PhoneAuth from "./PhoneAuth";
@@ -70,7 +66,6 @@ import { Button, Choice, Field, styles as s, colors } from "./ui";
 import DiscoverySurface from "./DiscoverySurface";
 import en from "./locales/en.json";
 import ta from "./locales/ta.json";
-import { jobSchema } from "../../../../packages/core/validation";
 type Lang = "en" | "ta";
 const PaymentTestLogin =
   __DEV__ && process.env.EXPO_PUBLIC_PAYMENT_TEST_AUTH === "true"
@@ -132,6 +127,7 @@ export default function LiveApp() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
+  const [postingPosition, setPostingPosition] = useState<Position | null>(null);
   const [locationOpen, setLocationOpen] = useState(false);
   const t: Translate = (k) =>
     (language === "ta" ? ta : en)[k as keyof typeof en] || en[k as keyof typeof en] || k;
@@ -175,6 +171,7 @@ export default function LiveApp() {
         qc.clear();
         setScreen("jobs");
         setPosition(null);
+        setPostingPosition(null);
         setLocationOpen(false);
         setError("");
         setMessage("");
@@ -286,6 +283,7 @@ export default function LiveApp() {
     } catch (e) {
       const text = (e as { message?: string }).message || "";
       const code = Object.keys(codeMap).find((k) => text.includes(k));
+      if (code === "CREDITS_REQUIRED") setCreditOverlay(true);
       setError(
         code
           ? codeMap[code]
@@ -403,19 +401,25 @@ export default function LiveApp() {
           onPost={() => setScreen("post")}
         />
       </View>
-      {screen === "post" && (
-        <Post
+      <View style={screen === "post" ? undefined : { display: "none" }}>
+        <PostWork
+          key={session.user.id}
+          userId={session.user.id}
+          active={screen === "post"}
+          onRestorePosition={setPostingPosition}
           openCredits={() => setCreditOverlay(true)}
           t={t}
-          position={position}
+          position={postingPosition}
           chooseLocation={() => setLocationOpen(true)}
           categories={categories.data || []}
           language={language}
-          busy={busy}
-          run={run}
-          onDone={() => setScreen("posts")}
+          onDone={(published) => {
+            void qc.invalidateQueries();
+            setMessage(published ? "jobPublished" : "draftSaved");
+            setScreen("posts");
+          }}
         />
-      )}
+      </View>
       {screen === "posts" && (
         <View style={s.row}>
           <Button title={t("postAJob")} onPress={() => setScreen("post")} />
@@ -623,9 +627,10 @@ export default function LiveApp() {
               <Button title={t("close")} secondary onPress={() => setLocationOpen(false)} />
               <LocationPicker
                 t={t}
-                initial={position}
+                initial={screen === "post" ? postingPosition : position}
                 onSelect={(p) => {
-                  setPosition(p);
+                  if (screen === "post") setPostingPosition(p);
+                  else setPosition(p);
                   setLocationOpen(false);
                 }}
               />
@@ -1037,234 +1042,6 @@ function AsyncState({ query, t }: { query: any; t: Translate }) {
   ) : !(query.data?.pages?.flat().length ?? query.data?.length) ? (
     <Text style={s.body}>{t("empty")}</Text>
   ) : null;
-}
-function Post({
-  openCredits,
-  t,
-  position,
-  chooseLocation,
-  categories,
-  language,
-  busy,
-  run,
-  onDone,
-}: {
-  t: Translate;
-  position: Position | null;
-  chooseLocation: () => void;
-  categories: any[];
-  language: Lang;
-  busy: boolean;
-  run: Run;
-  onDone: () => void;
-  openCredits: () => void;
-}) {
-  const [p, setP] = useState<any>({
-    kind: "business",
-    pay_unit: "day",
-    workers_required: "1",
-    pay: "",
-    title: "",
-    description: "",
-    schedule: "",
-    locality: "",
-    exact_address: "",
-    required_languages: ["ta"],
-    required_skills: [],
-    employment_type: "temporary",
-  });
-  useEffect(() => {
-    if (position)
-      setP((old: any) => ({
-        ...old,
-        locality: position.locality || old.locality,
-        city: position.city || old.city,
-        district: position.district || old.district,
-        state: position.state || old.state,
-        country: position.country || old.country || "IN",
-        exact_address: position.formatted_address || old.exact_address,
-      }));
-  }, [position]);
-  const [typeChosen, setTypeChosen] = useState(false);
-  const [requestId] = useState(() => Crypto.randomUUID());
-  const [draft, setDraft] = useState<string | null>(null);
-  const [invalid, setInvalid] = useState(false);
-  const [confirmPublish, setConfirmPublish] = useState(false);
-  const creditQuery = useQuery({
-    queryKey: creditBalanceKey,
-    queryFn: creditService.summary,
-    select: (summary) => summary.balance,
-    refetchInterval: 15000,
-  });
-  const update = (k: string, v: any) => setP((old: any) => ({ ...old, [k]: v }));
-  const submit = (publish: boolean) => {
-    const parsed = jobSchema.safeParse({
-      ...p,
-      latitude: position?.latitude,
-      longitude: position?.longitude,
-    });
-    if (!parsed.success) {
-      setInvalid(true);
-      return;
-    }
-    setInvalid(false);
-    run(async () => {
-      const id = draft || (await jobService.create(parsed.data, requestId));
-      setDraft(id);
-      if (publish) await jobService.publish(id);
-      onDone();
-    });
-  };
-  if (!typeChosen)
-    return (
-      <View style={{ gap: 20 }}>
-        <Text style={s.title}>{t("postTypeQuestion")}</Text>
-        {["residential", "business"].map((kind) => (
-          <Button
-            key={kind}
-            title={t(kind)}
-            onPress={() => {
-              update("kind", kind);
-              setTypeChosen(true);
-            }}
-          />
-        ))}
-      </View>
-    );
-  return (
-    <>
-      <Text style={s.title}>{t("post")}</Text>
-      <Text style={s.body}>{t("postingNote")}</Text>
-      <View style={s.row}>
-        {["business", "residential"].map((k) => (
-          <Choice
-            key={k}
-            title={t(k)}
-            selected={p.kind === k}
-            onPress={() => {
-              update("kind", k);
-              update("category", "");
-            }}
-          />
-        ))}
-      </View>
-      <Text style={s.label}>{t("category")}</Text>
-      <View style={s.row}>
-        {categories
-          .filter((c) => c.kind === p.kind)
-          .map((c) => (
-            <Choice
-              key={c.id}
-              title={language === "ta" ? c.name_ta : c.name_en}
-              selected={p.category === c.id}
-              onPress={() => update("category", c.id)}
-            />
-          ))}
-      </View>
-      {[
-        ["title", "title"],
-        ["business_name", "businessName"],
-        ["description", "description"],
-        ["pay", "amount"],
-        ["schedule", "schedule"],
-        ["workers_required", "workers"],
-        ["locality", "locality"],
-        ["exact_address", "address"],
-        ["city", "city"],
-        ["district", "district"],
-        ["state", "state"],
-        ["start_date", "startDate"],
-        ["benefits", "benefits"],
-        ["instructions", "instructions"],
-      ]
-        .filter(([key]) => p.kind === "business" || !["business_name", "benefits"].includes(key))
-        .map(([key, label]) => (
-          <Field
-            key={key}
-            label={t(label)}
-            value={p[key] || ""}
-            onChange={(v) => update(key, v)}
-            numeric={["pay", "workers_required"].includes(key)}
-            multiline={["description", "instructions"].includes(key)}
-          />
-        ))}
-      <View style={s.row}>
-        {["hour", "day", "job", "month"].map((k) => (
-          <Choice
-            key={k}
-            title={t(k)}
-            selected={p.pay_unit === k}
-            onPress={() => update("pay_unit", k)}
-          />
-        ))}
-      </View>
-      {p.kind === "business" && (
-        <View style={s.row}>
-          {["full_time", "part_time", "daily_wage", "temporary", "weekend", "shift"].map((k) => (
-            <Choice
-              key={k}
-              title={t(k)}
-              selected={p.employment_type === k}
-              onPress={() => update("employment_type", k)}
-            />
-          ))}
-        </View>
-      )}
-      <Field
-        label={t("languages")}
-        value={p.required_languages.join(", ")}
-        onChange={(v) => update("required_languages", csv(v))}
-      />
-      <Field
-        label={t("skills")}
-        value={p.required_skills.join(", ")}
-        onChange={(v) => update("required_skills", csv(v))}
-      />
-      <Button title={t(position ? "refreshLocation" : "gps")} secondary onPress={chooseLocation} />
-      {position && (
-        <Text style={s.body}>
-          {t("locationSelected")}: {position.label} · {t("privateLocationNote")}
-        </Text>
-      )}
-      {invalid && (
-        <Text accessibilityRole="alert" style={s.body}>
-          {t("validation")}
-        </Text>
-      )}
-      <Button
-        title={t("draft")}
-        disabled={busy || !position || !!draft}
-        secondary
-        onPress={() => submit(false)}
-      />
-      <Button
-        title={t("publish")}
-        disabled={busy || !position}
-        onPress={() => setConfirmPublish(true)}
-      />
-      <PublishCost
-        balance={creditQuery.isError ? null : (creditQuery.data ?? null)}
-        t={t}
-        onOpen={openCredits}
-      />
-      {confirmPublish && (
-        <View style={{ gap: 12 }}>
-          <Text style={s.heading}>{t("jobSummary")}</Text>
-          <JobSummary job={p} t={t} />
-          <PublishConfirmation
-            balance={creditQuery.isError ? null : (creditQuery.data ?? null)}
-            t={t}
-            busy={busy}
-            onCancel={() => setConfirmPublish(false)}
-            onConfirm={() => {
-              setConfirmPublish(false);
-              submit(true);
-            }}
-          />
-        </View>
-      )}
-    </>
-  );
 }
 function Activity({
   openCredits,

@@ -55,3 +55,5 @@ test("credit expiry presentation uses server time and rounds partial days withou
 });
 
 import "./payment-flow.test.ts";
+
+import "./posting-flow.test.ts";
