@@ -88,3 +88,7 @@ export function restorePostingDraft(raw: string | null, userId: string): any | n
     return null;
   }
 }
+
+export function completedPostingDraft(job: { status: string } | null) {
+  return !!job && job.status !== "draft";
+}

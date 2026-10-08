@@ -67,6 +67,16 @@ export const profileService = {
   },
 };
 export const jobService = {
+  async postingState(userId: string, requestId: string) {
+    const { data, error } = await backend()
+      .from("jobs")
+      .select("id,status")
+      .eq("poster_id", userId)
+      .eq("request_id", requestId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
   nearby: (lat: number, lng: number, radius: number, filter: Record<string, unknown>, offset = 0) =>
     rpc<any[]>("nearby_jobs", {
       p_lat: lat,

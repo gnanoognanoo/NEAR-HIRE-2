@@ -1,3 +1,4 @@
+import { completedPostingDraft } from "./posting-flow";
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -99,12 +100,12 @@ export default function PostWork({
       cancelled = true;
     };
   }, [userId]);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
       mounted.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
   useEffect(() => {
     if (!loaded) return;
     const r = { version: 1, owner: userId, requestId, fields: p, typeChosen, position };
@@ -176,6 +177,46 @@ export default function PostWork({
     );
     return parsed;
   };
+  const resetForm = () => {
+    setP({
+      kind: p.kind,
+      pay_unit: "day",
+      workers_required: "1",
+      pay: "",
+      title: "",
+      description: "",
+      schedule: "",
+      locality: "",
+      exact_address: "",
+      employment_type: "temporary",
+      is_urgent: false,
+      languages_text: "ta",
+      skills_text: "",
+    });
+    setRequestId(Crypto.randomUUID());
+    setTypeChosen(false);
+    setConfirmPublish(false);
+  };
+  useEffect(() => {
+    if (!active || !loaded || busy) return;
+    let cancelled = false;
+    jobService
+      .postingState(userId, requestId)
+      .then(async (job) => {
+        if (cancelled || !completedPostingDraft(job)) return;
+        // My Posts may have published/cancelled the saved draft while this form was hidden.
+        await writes.current.catch(() => {});
+        if (cancelled) return;
+        await storage.removeItem(postingDraftKey(userId));
+        if (cancelled) return;
+        resetForm();
+        if (job?.status === "active") onDone(true);
+      })
+      .catch(() => {}); // Reading status is optional; publication retry remains idempotent.
+    return () => {
+      cancelled = true;
+    };
+  }, [active, loaded, busy, requestId, userId]);
   const submit = async (publish: boolean) => {
     if (submitBusy.current) return;
     const parsed = parse();
@@ -190,24 +231,7 @@ export default function PostWork({
       if (publish) {
         await writes.current.catch(() => {});
         await storage.removeItem(postingDraftKey(userId));
-        setP({
-          kind: p.kind,
-          pay_unit: "day",
-          workers_required: "1",
-          pay: "",
-          title: "",
-          description: "",
-          schedule: "",
-          locality: "",
-          exact_address: "",
-          employment_type: "temporary",
-          is_urgent: false,
-          languages_text: "ta",
-          skills_text: "",
-        });
-        setRequestId(Crypto.randomUUID());
-        setTypeChosen(false);
-        setConfirmPublish(false);
+        resetForm();
       }
       onDone(publish);
     } catch (e) {

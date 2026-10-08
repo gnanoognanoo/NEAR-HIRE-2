@@ -166,3 +166,11 @@ test("draft restoration preserves fields, location and retry ID without crossing
   assert.equal(restorePostingDraft("broken", "owner"), null);
   assert.notEqual(postingDraftKey("a"), postingDraftKey("b"));
 });
+
+import { completedPostingDraft } from "./posting-flow.ts";
+test("published/cancelled saved drafts are retired before reusing the Post Work form", () => {
+  assert.equal(completedPostingDraft(null), false);
+  assert.equal(completedPostingDraft({ status: "draft" }), false);
+  for (const status of ["active", "expired", "cancelled", "completed"])
+    assert.equal(completedPostingDraft({ status }), true);
+});

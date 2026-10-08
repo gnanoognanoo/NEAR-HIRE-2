@@ -1156,7 +1156,7 @@ function Activity({
                     openCredits={openCredits}
                     t={t}
                     busy={busy}
-                    onConfirm={() => run(() => jobService.publish(a.id))}
+                    onConfirm={() => run(() => jobService.publish(a.id), "jobPublished")}
                   />
                 )}{" "}
                 {(a.status === "expired" ||
@@ -1167,7 +1167,9 @@ function Activity({
                     t={t}
                     busy={busy}
                     repost
-                    onConfirm={() => run(() => jobService.repost(a.id, Crypto.randomUUID()))}
+                    onConfirm={() =>
+                      run(() => jobService.repost(a.id, Crypto.randomUUID()), "jobPublished")
+                    }
                   />
                 )}{" "}
                 {a.status === "active" && Date.parse(a.expires_at) > Date.now() && (
