@@ -1,5 +1,6 @@
+import { NeoModal as Modal, NeoBottomSheetSurface, neoCompact } from "./ui";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Platform, Modal, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, ScrollView, Text, View } from "react-native";
 import { Button, Field, styles as s, colors } from "./ui";
 import { locationService, type Place } from "./services";
 import { boundedLocation, coordinates, locationErrorKey, type Position } from "./location-logic";
@@ -113,8 +114,9 @@ export default function LocationPicker({
           top: 10,
           left: 10,
           right: 10,
-          backgroundColor: "white",
-          borderRadius: 14,
+          backgroundColor: colors.surface,
+          borderRadius: 20,
+          ...neoCompact,
           padding: 12,
           maxHeight: "45%",
         }}
@@ -192,16 +194,17 @@ export default function LocationPicker({
           bottom: 34,
           left: 10,
           right: 10,
-          backgroundColor: "white",
+          backgroundColor: colors.surface,
           padding: 12,
-          borderRadius: 14,
+          borderRadius: 20,
+          ...neoCompact,
           gap: 8,
         }}
       >
         {point && <Text style={s.body}>{locationStatus(point, t)}</Text>}
         <Text style={s.body}>{t("movePin")}</Text>
         <Button
-          title={t("manualCoordinates")}
+          title={t("neoManualCoordinates")}
           secondary
           onPress={() => {
             setSheet(true);
@@ -211,56 +214,60 @@ export default function LocationPicker({
         <Button title={t("confirmLocation")} disabled={!point} onPress={() => setSheet(true)} />
       </View>
       <Modal visible={sheet} transparent onRequestClose={() => setSheet(false)}>
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.2)" }}>
-          <ScrollView
-            style={{ maxHeight: "85%", backgroundColor: "white" }}
-            contentContainerStyle={s.content}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Button title={t("close")} secondary onPress={() => setSheet(false)} />
-            <Button
-              title={t("manualCoordinates")}
-              secondary
-              onPress={() => setDiagnostics(!diagnostics)}
-            />
-            {diagnostics && (
-              <>
-                <Text style={s.body}>{t("manualCoordinates")}</Text>
-                <View style={s.row}>
-                  <Field label={t("latitude")} value={lat} onChange={setLat} />
-                  <Field label={t("longitude")} value={lng} onChange={setLng} />
-                </View>
-                <Button
-                  title={t("useCoordinates")}
-                  secondary
-                  disabled={busy}
-                  onPress={() => {
-                    try {
-                      void select({ ...coordinates(lat, lng), source: "manual" });
-                    } catch (e) {
-                      setError(locationErrorKey(e));
-                    }
-                  }}
-                />
-              </>
-            )}
-            <Field label={t("locality")} value={locality} onChange={setLocality} />
-            <Field label={t("privateAddress")} value={address} onChange={setAddress} />
-            <Text style={s.body}>{t("privateLocationNote")}</Text>
-            <Button
-              title={t("confirmLocation")}
-              disabled={!point || busy || locality.trim().length < 2}
-              onPress={() => {
-                if (point)
-                  onSelect({
-                    ...point,
-                    locality: locality.trim(),
-                    formatted_address: address.trim(),
-                    label: locality.trim(),
-                  });
-              }}
-            />
-          </ScrollView>
+        <View
+          style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(37,50,71,0.32)" }}
+        >
+          <NeoBottomSheetSurface>
+            <ScrollView
+              style={{ maxHeight: "85%" }}
+              contentContainerStyle={s.content}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Button title={t("close")} secondary onPress={() => setSheet(false)} />
+              <Button
+                title={t("neoManualCoordinates")}
+                secondary
+                onPress={() => setDiagnostics(!diagnostics)}
+              />
+              {diagnostics && (
+                <>
+                  <Text style={s.body}>{t("manualCoordinates")}</Text>
+                  <View style={s.row}>
+                    <Field label={t("latitude")} value={lat} onChange={setLat} />
+                    <Field label={t("longitude")} value={lng} onChange={setLng} />
+                  </View>
+                  <Button
+                    title={t("useCoordinates")}
+                    secondary
+                    disabled={busy}
+                    onPress={() => {
+                      try {
+                        void select({ ...coordinates(lat, lng), source: "manual" });
+                      } catch (e) {
+                        setError(locationErrorKey(e));
+                      }
+                    }}
+                  />
+                </>
+              )}
+              <Field label={t("locality")} value={locality} onChange={setLocality} />
+              <Field label={t("privateAddress")} value={address} onChange={setAddress} />
+              <Text style={s.body}>{t("privateLocationNote")}</Text>
+              <Button
+                title={t("confirmLocation")}
+                disabled={!point || busy || locality.trim().length < 2}
+                onPress={() => {
+                  if (point)
+                    onSelect({
+                      ...point,
+                      locality: locality.trim(),
+                      formatted_address: address.trim(),
+                      label: locality.trim(),
+                    });
+                }}
+              />
+            </ScrollView>
+          </NeoBottomSheetSurface>
         </View>
       </Modal>
     </View>

@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { Button, colors, styles as s } from "./ui";
+import { Button, NeoSurface, neoCompact, NeoStatusBadge, colors, styles as s } from "./ui";
 
 // A display estimate only. publish_job remains authoritative and deducts atomically.
 export function JobCreditBalance({
@@ -16,18 +16,25 @@ export function JobCreditBalance({
   onOpen?: () => void;
 }) {
   return (
-    <View style={[s.card, { padding: 16, gap: 10 }]}>
+    <NeoSurface>
       <View style={s.row}>
         <Feather name="briefcase" size={18} color={colors.accent} />
         <Text style={s.label}>{t("credits")}</Text>
       </View>
-      <Text style={s.heading}>
-        {balance === null ? t("creditBalanceUnavailable") : `${balance} ${t("availableCredits")}`}
-      </Text>
+      {balance === null ? (
+        <Text style={s.heading}>{t("creditBalanceUnavailable")}</Text>
+      ) : (
+        <>
+          <Text style={[s.title, { fontSize: 44, lineHeight: 56, color: colors.accent }]}>
+            {balance}
+          </Text>
+          <Text style={s.label}>{t("availableCredits")}</Text>
+        </>
+      )}
       <Text style={s.body}>{t("creditUnit")}</Text>
       {posting && (
         <>
-          <Text style={s.label}>{t("postingCost")}</Text>
+          <NeoStatusBadge label={t("postingCost")} />
           <Text style={s.body}>
             {t("balanceAfter")}: {balance === null ? "—" : Math.max(0, balance - 1)}
           </Text>
@@ -41,7 +48,7 @@ export function JobCreditBalance({
           onPress={onOpen}
         />
       )}
-    </View>
+    </NeoSurface>
   );
 }
 export function PublishConfirmation({
@@ -71,6 +78,8 @@ export function PublishConfirmation({
       <Text style={s.body}>{t("creditEstimate")}</Text>
       <Button
         title={t("publishJob")}
+        loading={busy}
+        icon="check"
         disabled={busy || balance === null || balance < 1}
         onPress={onConfirm}
       />
@@ -94,10 +103,11 @@ export function CreditBalanceChip({
       accessibilityLabel={`${balance ?? "—"} ${t("creditChipLabel")}`}
       onPress={onPress}
       style={{
-        minHeight: 44,
+        minHeight: 48,
         minWidth: 58,
         paddingHorizontal: 12,
-        borderRadius: 22,
+        borderRadius: 16,
+        ...neoCompact,
         backgroundColor: colors.pale,
         flexDirection: "row",
         gap: 6,

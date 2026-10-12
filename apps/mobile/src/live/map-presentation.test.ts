@@ -45,3 +45,5 @@ test("filtered loaded counts exclude expiration and preserve bilingual radius/pl
     assert.equal(activeNearby(rows, now + 2000).length, 0);
   }
 });
+
+import "./neo-tokens.test.ts";

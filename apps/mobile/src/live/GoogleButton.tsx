@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { googleAuth } from "./google-auth";
 import { authErrorKey } from "./auth-logic";
-import { colors, styles as s } from "./ui";
+import { NeoFeedback, colors, styles as s } from "./ui";
 export default function GoogleButton({
   t,
   link = false,
@@ -21,7 +21,11 @@ export default function GoogleButton({
         accessibilityLabel={title}
         accessibilityState={{ disabled: busy, busy }}
         disabled={busy}
-        style={[s.input, { alignItems: "center", backgroundColor: colors.white }]}
+        style={({ pressed }) => [
+          s.card,
+          { padding: 16, minHeight: 56, alignItems: "center", borderRadius: 16 },
+          pressed && { backgroundColor: colors.pale },
+        ]}
         onPress={async () => {
           if (pending.current) return;
           pending.current = true;
@@ -44,14 +48,18 @@ export default function GoogleButton({
           }
         }}
       >
-        <Text style={s.heading}>{title}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <Text
+            accessible={false}
+            style={{ fontSize: 22, fontWeight: "700", color: colors.accent }}
+          >
+            G
+          </Text>
+          <Text style={[s.label, { flexShrink: 1 }]}>{title}</Text>
+        </View>
       </Pressable>
       {busy && <ActivityIndicator accessibilityLabel={t("wait")} color={colors.accent} />}
-      {!!error && (
-        <Text accessibilityRole="alert" style={s.body}>
-          {t(error)}
-        </Text>
-      )}
+      {!!error && <NeoFeedback message={t(error)} tone="error" />}
     </View>
   );
 }

@@ -1,7 +1,7 @@
+import { NeoModal as Modal, NeoBottomSheetSurface, NeoIconButton, neoCompact } from "./ui";
 import CurrentLocationControl from "./CurrentLocationControl";
 import React, { useState, useEffect } from "react";
-import { Modal, Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import JobMap, { type MapProps } from "./JobMap";
 import DistanceControl from "./DistanceControl";
@@ -64,20 +64,11 @@ export default function DiscoverySurface({
     name: React.ComponentProps<typeof Feather>["name"],
     label: string,
     action: () => void,
-  ) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={action}
-      style={m.icon}
-    >
-      <Feather name={name} size={20} color={colors.accent} />
-    </Pressable>
-  );
+  ) => <NeoIconButton name={name} label={label} onPress={action} />;
   return (
     <View
       testID="map-discovery-surface"
-      style={{ flex: 1, minHeight: 0, backgroundColor: colors.white }}
+      style={{ flex: 1, minHeight: 0, backgroundColor: colors.surface }}
     >
       {!list && (
         <View style={StyleSheet.absoluteFill}>
@@ -218,7 +209,12 @@ export default function DiscoverySurface({
               gap: 6,
             }}
           >
-            <View style={[m.panel, { padding: 8, flexDirection: "row", gap: 9, flexShrink: 1 }]}>
+            <View
+              style={[
+                m.panel,
+                { padding: 8, flexDirection: "row", gap: 8, flexShrink: 1, flexWrap: "wrap" },
+              ]}
+            >
               <Text style={{ color: JOB_MARKER_COLORS.normal, fontSize: 12 }}>
                 ● {t("normalJob")}
               </Text>
@@ -246,14 +242,7 @@ export default function DiscoverySurface({
         <View
           style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(39,34,49,0.25)" }}
         >
-          <SafeAreaView
-            style={{
-              maxHeight: "85%",
-              backgroundColor: colors.white,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-            }}
-          >
+          <NeoBottomSheetSurface>
             <ScrollView contentContainerStyle={s.content}>
               <View style={[s.row, { justifyContent: "space-between" }]}>
                 <Text style={s.heading}>{t("filters")}</Text>
@@ -267,7 +256,7 @@ export default function DiscoverySurface({
               )}
               <Button title={t("continue")} onPress={() => setSheet(false)} />
             </ScrollView>
-          </SafeAreaView>
+          </NeoBottomSheetSurface>
         </View>
       </Modal>
     </View>
@@ -275,19 +264,22 @@ export default function DiscoverySurface({
 }
 const m = StyleSheet.create({
   panel: {
-    backgroundColor: "rgba(255,255,255,0.96)",
-    borderRadius: 15,
+    ...neoCompact,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderWidth: 1,
     borderColor: colors.line,
+    borderTopColor: colors.white,
   },
   icon: {
     minWidth: 44,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 13,
-    backgroundColor: colors.white,
+    borderRadius: 16,
+    ...neoCompact,
+    backgroundColor: colors.surface,
   },
 });

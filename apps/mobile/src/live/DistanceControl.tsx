@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
-import { colors, styles as s } from "./ui";
+import { Pressable, Text, View } from "react-native";
+import { NeoInput as TextInput, colors, styles as s } from "./ui";
 import { radiusKmToMetres } from "./radius-logic";
 export default function DistanceControl({
   metres,
@@ -46,7 +46,8 @@ export default function DistanceControl({
           onChangeText={update}
           keyboardType="number-pad"
           selectTextOnFocus
-          style={[s.input, { flex: 1, minWidth: 0, textAlign: "center" }]}
+          containerStyle={{ flex: 1 }}
+          style={{ minWidth: 0, textAlign: "center" }}
           onSubmitEditing={() => update(input)}
         />
         <Text style={s.label}>{t("distanceKm")}</Text>

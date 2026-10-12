@@ -386,5 +386,15 @@
   "postingTitleError": "3 முதல் 120 எழுத்துகளில் தலைப்பை உள்ளிடவும்.",
   "postingDescriptionError": "10 முதல் 3,000 எழுத்துகளில் வேலையை விவரிக்கவும்.",
   "postingScheduleError": "வேலை நேர விவரங்களை உள்ளிடவும் (200 எழுத்துகளுக்குள்).",
-  "postingLocalityError": "2 முதல் 120 எழுத்துகளில் பகுதியை உள்ளிடவும்."
+  "postingLocalityError": "2 முதல் 120 எழுத்துகளில் பகுதியை உள்ளிடவும்.",
+  "neoTagline": "வேலை வாய்ப்பு, வீட்டிற்கு அருகில்.",
+  "neoWelcome": "உங்கள் அடுத்த தொடக்கம்",
+  "neoJobBasics": "வேலை விவரம்",
+  "neoPaySchedule": "ஊதியம் மற்றும் நேரம்",
+  "neoJobLocation": "வேலை நடைபெறும் இடம்",
+  "neoMoreDetails": "கூடுதல் விவரங்கள்",
+  "neoUrgentHint": "அவசர வேலை வாய்ப்புகளை எளிதில் அடையாளம் காணலாம்.",
+  "neoDesignReview": "DEV · Soft UI ஆய்வு",
+  "neoChooseArea": "உங்கள் பகுதியைத் தேர்ந்தெடுக்கவும்",
+  "neoManualCoordinates": "ஆயத்தொலைவுகளை உள்ளிடு"
 }

@@ -1,3 +1,5 @@
+import { Feather } from "@expo/vector-icons";
+import { NeoCard, NeoToggle, NeoStatusBadge, NeoFeedback, NeoOptionPicker } from "./ui";
 import { completedPostingDraft } from "./posting-flow";
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -289,90 +291,146 @@ export default function PostWork({
             />
           ))}
         </View>
-        <Text style={s.label}>{t("category")}</Text>
-        <View style={s.row}>
-          {categories
+        <NeoOptionPicker
+          label={t("category")}
+          closeLabel={t("close")}
+          items={categories
             .filter((c) => c.kind === p.kind)
-            .map((c) => (
-              <Choice
-                key={c.id}
-                title={language === "ta" ? c.name_ta : c.name_en}
-                selected={p.category === c.id}
-                onPress={() => update("category", c.id)}
-              />
-            ))}
-        </View>
+            .map((c) => ({ value: c.id, label: language === "ta" ? c.name_ta : c.name_en }))}
+          value={p.category}
+          onChange={(value) => update("category", value)}
+        />
         {[
-          ["title", "title"],
-          ["business_name", "businessName"],
-          ["description", "description"],
-          ["pay", "amount"],
-          ["schedule", "schedule"],
-          ["workers_required", "workers"],
-          ["locality", "locality"],
-          ["exact_address", "postingAddress"],
-          ["city", "city"],
-          ["district", "district"],
-          ["state", "state"],
-          ["start_date", "postingDateLabel"],
-          ["start_time", "postingTimeLabel"],
-          ["benefits", "benefits"],
-          ["instructions", "instructions"],
-        ]
-          .filter(([key]) => p.kind === "business" || !["business_name", "benefits"].includes(key))
-          .map(([key, label]) => (
-            <Field
-              key={key}
-              label={t(label)}
-              value={p[key] || ""}
-              onChange={(v) => update(key, v)}
-              numeric={["pay", "workers_required"].includes(key)}
-              multiline={["description", "instructions", "exact_address"].includes(key)}
-              maxLength={
-                (
-                  {
-                    title: 120,
-                    business_name: 120,
-                    description: 3000,
-                    pay: 12,
-                    workers_required: 3,
-                    schedule: 200,
-                    locality: 120,
-                    exact_address: 500,
-                    city: 120,
-                    district: 120,
-                    state: 120,
-                    start_date: 10,
-                    start_time: 5,
-                    benefits: 1000,
-                    instructions: 1000,
-                  } as Record<string, number>
-                )[key]
-              }
-            />
-          ))}
-        <View style={s.row}>
-          {["hour", "day", "job", "month"].map((k) => (
-            <Choice
-              key={k}
-              title={t(k)}
-              selected={p.pay_unit === k}
-              onPress={() => update("pay_unit", k)}
-            />
-          ))}
-        </View>
-        {p.kind === "business" && (
-          <View style={s.row}>
-            {["full_time", "part_time", "daily_wage", "temporary", "weekend", "shift"].map((k) => (
-              <Choice
-                key={k}
-                title={t(k)}
-                selected={p.employment_type === k}
-                onPress={() => update("employment_type", k)}
-              />
-            ))}
-          </View>
-        )}
+          {
+            title: "neoJobBasics",
+            icon: "file-text",
+            fields: [
+              ["title", "title"],
+              ["business_name", "businessName"],
+              ["description", "description"],
+            ],
+          },
+          {
+            title: "neoPaySchedule",
+            icon: "calendar",
+            fields: [
+              ["pay", "amount"],
+              ["workers_required", "workers"],
+              ["schedule", "schedule"],
+              ["start_date", "postingDateLabel"],
+              ["start_time", "postingTimeLabel"],
+            ],
+          },
+          {
+            title: "neoJobLocation",
+            icon: "map-pin",
+            fields: [
+              ["locality", "locality"],
+              ["exact_address", "postingAddress"],
+              ["city", "city"],
+              ["district", "district"],
+              ["state", "state"],
+            ],
+          },
+          {
+            title: "neoMoreDetails",
+            icon: "align-left",
+            fields: [
+              ["benefits", "benefits"],
+              ["instructions", "instructions"],
+            ],
+          },
+        ].map((group) => (
+          <NeoCard key={group.title}>
+            <View style={s.row}>
+              <Feather name={group.icon as any} size={18} color={colors.accent} />
+              <Text style={s.heading}>{t(group.title)}</Text>
+            </View>
+            {group.fields
+              .filter(
+                ([key]) => p.kind === "business" || !["business_name", "benefits"].includes(key),
+              )
+              .map(([key, label]) => (
+                <Field
+                  key={key}
+                  label={t(label)}
+                  value={p[key] || ""}
+                  onChange={(v) => update(key, v)}
+                  numeric={["pay", "workers_required"].includes(key)}
+                  multiline={["description", "instructions", "exact_address"].includes(key)}
+                  maxLength={
+                    (
+                      {
+                        title: 120,
+                        business_name: 120,
+                        description: 3000,
+                        pay: 12,
+                        workers_required: 3,
+                        schedule: 200,
+                        locality: 120,
+                        exact_address: 500,
+                        city: 120,
+                        district: 120,
+                        state: 120,
+                        start_date: 10,
+                        start_time: 5,
+                        benefits: 1000,
+                        instructions: 1000,
+                      } as Record<string, number>
+                    )[key]
+                  }
+                  error={
+                    issues.find((i) => i.path === key)
+                      ? t(issues.find((i) => i.path === key)!.key)
+                      : undefined
+                  }
+                />
+              ))}
+            {group.title === "neoPaySchedule" && (
+              <>
+                <View style={s.row}>
+                  {["hour", "day", "job", "month"].map((k) => (
+                    <Choice
+                      key={k}
+                      title={t(k)}
+                      selected={p.pay_unit === k}
+                      onPress={() => update("pay_unit", k)}
+                    />
+                  ))}
+                </View>
+                {p.kind === "business" && (
+                  <View style={s.row}>
+                    {["full_time", "part_time", "daily_wage", "temporary", "weekend", "shift"].map(
+                      (k) => (
+                        <Choice
+                          key={k}
+                          title={t(k)}
+                          selected={p.employment_type === k}
+                          onPress={() => update("employment_type", k)}
+                        />
+                      ),
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+            {group.title === "neoJobLocation" && (
+              <>
+                <Button
+                  icon="map-pin"
+                  title={t(position ? "refreshLocation" : "gps")}
+                  secondary
+                  onPress={chooseLocation}
+                />
+                {position && (
+                  <Text style={s.body}>
+                    {t("locationSelected")}: {position.label} · {t("privateLocationNote")}
+                  </Text>
+                )}
+              </>
+            )}
+          </NeoCard>
+        ))}
         <Field
           label={t("languages")}
           value={p.languages_text}
@@ -383,21 +441,12 @@ export default function PostWork({
           value={p.skills_text}
           onChange={(v) => update("skills_text", v)}
         />
-        <Choice
+        <NeoToggle
           title={t("postingUrgent")}
+          hint={t("neoUrgentHint")}
           selected={p.is_urgent}
           onPress={() => update("is_urgent", !p.is_urgent)}
         />
-        <Button
-          title={t(position ? "refreshLocation" : "gps")}
-          secondary
-          onPress={chooseLocation}
-        />
-        {position && (
-          <Text style={s.body}>
-            {t("locationSelected")}: {position.label} · {t("privateLocationNote")}
-          </Text>
-        )}
         {issues.map((i, n) => (
           <Text key={n} accessibilityRole="alert" style={s.body}>
             {t(
@@ -433,11 +482,7 @@ export default function PostWork({
             : {t(i.key)}
           </Text>
         ))}
-        {!!error && (
-          <Text accessibilityRole="alert" style={s.body}>
-            {t(error)}
-          </Text>
-        )}
+        {!!error && <NeoFeedback message={t(error)} tone="error" />}
         {busy && <ActivityIndicator accessibilityLabel={t("loading")} color={colors.accent} />}
         <Button title={t("draft")} disabled={busy} secondary onPress={() => submit(false)} />
         <Button
@@ -466,8 +511,8 @@ export default function PostWork({
           onOpen={openCredits}
         />
         {confirmPublish && (
-          <View style={{ gap: 12 }}>
-            <Text style={s.heading}>{t("jobSummary")}</Text>
+          <NeoCard>
+            <NeoStatusBadge label={t("jobSummary")} />
             <JobSummary
               job={{
                 ...p,
@@ -485,7 +530,7 @@ export default function PostWork({
                 void submit(true);
               }}
             />
-          </View>
+          </NeoCard>
         )}
       </View>
     </KeyboardAvoidingView>

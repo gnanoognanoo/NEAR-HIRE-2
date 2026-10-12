@@ -1,7 +1,8 @@
+import { NeoModal as Modal, NeoBottomSheetSurface, neoCompact } from "./ui";
 import { Feather } from "@expo/vector-icons";
 import CurrentLocationControl from "./CurrentLocationControl";
 import React, { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
+import { Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
 import JobMap from "./JobMap";
 import DistanceControl from "./DistanceControl";
 import type { Position } from "./location-logic";
@@ -94,6 +95,14 @@ export default function WorkerSurface({
           />
         </View>
       )}
+      {!list && !position && (
+        <View style={{ position: "absolute", top: "40%", left: 24, right: 24 }}>
+          <View style={s.card}>
+            <Text style={s.heading}>{t("neoChooseArea")}</Text>
+            <Button title={t("selectLocation")} secondary icon="map-pin" onPress={onLocation} />
+          </View>
+        </View>
+      )}
       <View
         style={
           list
@@ -103,12 +112,19 @@ export default function WorkerSurface({
       >
         <View
           testID="post-compact-panel"
-          style={[s.card, { paddingHorizontal: 12, paddingVertical: 6, gap: 2 }]}
+          style={[s.card, { paddingHorizontal: 16, paddingVertical: 8, gap: 4, ...neoCompact }]}
         >
           <Text style={[s.heading, { fontSize: 16, lineHeight: 22 }]}>{t("nearbyWorkers")}</Text>
-          <Text numberOfLines={1} style={[s.body, { fontSize: 13, lineHeight: 18 }]}>
-            {position?.label || t("selectLocation")}
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("selectLocation")}
+            onPress={onLocation}
+            style={{ minHeight: 44, justifyContent: "center" }}
+          >
+            <Text numberOfLines={1} style={[s.body, { fontSize: 14, lineHeight: 22 }]}>
+              {position?.label || t("selectLocation")}
+            </Text>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("filters")}
@@ -122,14 +138,15 @@ export default function WorkerSurface({
             </Text>
             <Feather name="sliders" size={19} color={colors.accent} />
           </Pressable>
-          <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Pressable
               accessibilityRole="button"
               onPress={onPost}
               style={{
-                minHeight: 44,
-                paddingHorizontal: 12,
-                borderRadius: 10,
+                minHeight: 48,
+                paddingHorizontal: 16,
+                borderRadius: 16,
+                ...neoCompact,
                 backgroundColor: colors.accent,
                 justifyContent: "center",
                 flexShrink: 1,
@@ -201,25 +218,26 @@ export default function WorkerSurface({
         </ScrollView>
       </Modal>
       <Modal visible={filters} transparent onRequestClose={() => setFilters(false)}>
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.2)" }}>
-          <ScrollView
-            style={{ maxHeight: "85%", backgroundColor: colors.white }}
-            contentContainerStyle={s.content}
-          >
-            <Text style={s.heading}>{t("filters")}</Text>
-            <Field label={t("searchWorkers")} value={query} onChange={onQuery} />
-            <DistanceControl metres={radius} onChange={onRadius} t={t} />
-            <Button
-              title={t("refreshLocation")}
-              secondary
-              onPress={() => {
-                setFilters(false);
-                onLocation();
-              }}
-            />
-            <Text style={s.body}>{t("workerPrivacy")}</Text>
-            <Button title={t("continue")} onPress={() => setFilters(false)} />
-          </ScrollView>
+        <View
+          style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(37,50,71,0.32)" }}
+        >
+          <NeoBottomSheetSurface>
+            <ScrollView style={{ maxHeight: "85%" }} contentContainerStyle={s.content}>
+              <Text style={s.heading}>{t("filters")}</Text>
+              <Field label={t("searchWorkers")} value={query} onChange={onQuery} />
+              <DistanceControl metres={radius} onChange={onRadius} t={t} />
+              <Button
+                title={t("refreshLocation")}
+                secondary
+                onPress={() => {
+                  setFilters(false);
+                  onLocation();
+                }}
+              />
+              <Text style={s.body}>{t("workerPrivacy")}</Text>
+              <Button title={t("continue")} onPress={() => setFilters(false)} />
+            </ScrollView>
+          </NeoBottomSheetSurface>
         </View>
       </Modal>
     </View>

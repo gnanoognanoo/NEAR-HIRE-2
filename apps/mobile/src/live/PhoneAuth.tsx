@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Text, TextInput } from "react-native";
+import { ActivityIndicator, Text } from "react-native";
 import { authService } from "./services";
 import { authErrorKey } from "./auth-logic";
-import { Button, styles as s, colors } from "./ui";
+import { Button, NeoInput as TextInput, NeoFeedback, styles as s, colors } from "./ui";
 export default function PhoneAuth({
   t,
   onVerified,
@@ -107,16 +107,8 @@ export default function PhoneAuth({
         onPress={() => void perform(false)}
       />
       {busy && <ActivityIndicator accessibilityLabel={t("wait")} color={colors.accent} />}
-      {!!error && (
-        <Text accessibilityRole="alert" style={s.body}>
-          {t(error)}
-        </Text>
-      )}
-      {!!notice && (
-        <Text accessibilityLiveRegion="polite" style={s.body}>
-          {t(notice)}
-        </Text>
-      )}
+      {!!error && <NeoFeedback message={t(error)} tone="error" />}
+      {!!notice && <NeoFeedback message={t(notice)} />}
     </>
   );
 }

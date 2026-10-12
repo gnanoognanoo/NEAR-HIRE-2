@@ -32,11 +32,9 @@ import {
   ActivityIndicator,
   BackHandler,
   Linking,
-  Modal,
   ScrollView,
   Text,
   View,
-  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -62,7 +60,19 @@ import {
   reportService,
   reviewService,
 } from "./services";
-import { Button, Choice, Field, styles as s, colors } from "./ui";
+import {
+  Button,
+  Choice,
+  Field,
+  NeoHeader,
+  NeoBottomNavigation,
+  NeoFeedback,
+  NeoSurface,
+  NeoStatusBadge,
+  NeoModal as Modal,
+  styles as s,
+  colors,
+} from "./ui";
 import DiscoverySurface from "./DiscoverySurface";
 import en from "./locales/en.json";
 import ta from "./locales/ta.json";
@@ -97,16 +107,8 @@ function Feedback() {
   return (
     <>
       {busy && <ActivityIndicator color={colors.accent} />}
-      {!!error && (
-        <Text accessibilityRole="alert" style={s.body}>
-          {t(error)}
-        </Text>
-      )}
-      {!!message && (
-        <Text accessibilityLiveRegion="polite" style={s.body}>
-          {t(message)}
-        </Text>
-      )}
+      {!!error && <NeoFeedback message={t(error)} tone="error" />}
+      {!!message && <NeoFeedback message={t(message)} />}
     </>
   );
 }
@@ -309,7 +311,10 @@ export default function LiveApp() {
     </>
   ) : !language ? (
     <>
-      <Text style={s.title}>{t("chooseLanguage")}</Text>
+      <NeoSurface>
+        <Text style={s.title}>{t("chooseLanguage")}</Text>
+        <Text style={s.body}>{t("neoTagline")}</Text>
+      </NeoSurface>
       <Button title="English" onPress={() => choose("en")} />
       <Button title="தமிழ்" secondary onPress={() => choose("ta")} />
     </>
@@ -320,7 +325,11 @@ export default function LiveApp() {
     </>
   ) : !session ? (
     <>
-      <Text style={s.title}>{t("loginTagline")}</Text>
+      <NeoSurface>
+        <NeoStatusBadge label={t("neoWelcome")} />
+        <Text style={s.title}>{t("loginTagline")}</Text>
+        <Text style={s.body}>{t("neoTagline")}</Text>
+      </NeoSurface>
       <GoogleButton t={t} />
       <Text style={[s.body, { textAlign: "center" }]}>{t("authOr")}</Text>
       <PhoneAuth t={t} onVerified={() => setMessage("otpSuccess")} />
@@ -373,7 +382,6 @@ export default function LiveApp() {
       {screen === "credits" && (
         <>
           <Button title={t("profile")} secondary onPress={() => setScreen("profile")} />
-          <Text style={s.title}>{t("profileCredits")}</Text>
           <Credits t={t} />
         </>
       )}
@@ -536,24 +544,15 @@ export default function LiveApp() {
         </Modal>
       )}
       <SafeAreaView style={s.page}>
-        <View
-          style={{
-            paddingHorizontal: 22,
-            paddingVertical: 16,
-            borderBottomWidth: 1,
-            borderColor: colors.line,
-          }}
-        >
-          <View style={[s.row, { justifyContent: "space-between", flexWrap: "nowrap" }]}>
-            <Text style={s.brand}>
-              {t("brand")}
-              <Text style={{ color: colors.accent }}>.</Text>
-            </Text>
-            {session && workspace === "post" && (
+        <NeoHeader
+          title={t("brand")}
+          subtitle={t(workspace === "post" ? "post" : workspace === "find" ? "find" : "neoTagline")}
+          trailing={
+            session && workspace === "post" ? (
               <LiveCreditChip t={t} onOpen={() => setScreen("credits")} />
-            )}
-          </View>
-        </View>
+            ) : undefined
+          }
+        />
         <ScrollView
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={200}
@@ -575,50 +574,29 @@ export default function LiveApp() {
               : {},
           ]}
         >
-          {!!error && (
-            <View accessibilityRole="alert" style={s.error}>
-              <Text style={s.body}>{t(error)}</Text>
-            </View>
-          )}
-          {!!message && (
-            <View accessibilityLiveRegion="polite" style={s.notice}>
-              <Text style={s.body}>{t(message)}</Text>
-            </View>
-          )}
-          {busy && <ActivityIndicator color={colors.accent} />} {content}
+          {!!error && <NeoFeedback message={t(error)} tone="error" />}
+          {!!message && <NeoFeedback message={t(message)} />}
+          {busy && <ActivityIndicator color={colors.accent} />}
+          {content}
         </ScrollView>
         {!!session && !!workspace && profileComplete(profile.data) && (
-          <View style={s.nav}>
-            {workspaceTabs(workspace!).map((k) => (
-              <View key={k} style={s.navItem}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    selected: screen === k || (k === "profile" && screen === "credits"),
-                  }}
-                  onPress={() => {
-                    setScreen(k);
-                    setError("");
-                    setMessage("");
-                  }}
-                  style={{ minHeight: 48, padding: 4, justifyContent: "center", width: "100%" }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      textAlign: "center",
-                      color:
-                        screen === k || (k === "profile" && screen === "credits")
-                          ? colors.accent
-                          : colors.muted,
-                    }}
-                  >
-                    {t(routeLabel(k))}
-                  </Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
+          <NeoBottomNavigation
+            items={workspaceTabs(workspace!).map((k) => ({ id: k, label: t(routeLabel(k)) }))}
+            selected={
+              ["credits", "settings", "preferences", "loginSecurity", "editProfile"].includes(
+                screen,
+              )
+                ? "profile"
+                : screen === "post"
+                  ? "posts"
+                  : screen
+            }
+            onSelect={(k) => {
+              setScreen(k);
+              setError("");
+              setMessage("");
+            }}
+          />
         )}
         <Modal visible={locationOpen} onRequestClose={() => setLocationOpen(false)}>
           <SafeAreaView style={s.page}>
@@ -799,8 +777,12 @@ function Jobs({
     <View style={{ flex: 1 }}>
       {!position ? (
         <View style={s.content}>
-          <Text style={s.body}>{t("noLocation")}</Text>
-          <Button title={t("select")} onPress={chooseLocation} />
+          <NeoSurface>
+            <NeoStatusBadge label={t("find")} />
+            <Text style={s.heading}>{t("neoChooseArea")}</Text>
+            <Text style={s.body}>{t("noLocation")}</Text>
+            <Button icon="map-pin" title={t("select")} onPress={chooseLocation} />
+          </NeoSurface>
         </View>
       ) : (
         <DiscoverySurface
@@ -1033,14 +1015,19 @@ function Jobs({
 }
 function AsyncState({ query, t }: { query: any; t: Translate }) {
   return query.isPending ? (
-    <ActivityIndicator color={colors.accent} />
+    <NeoSurface compact>
+      <ActivityIndicator accessibilityLabel={t("wait")} color={colors.accent} />
+      <Text style={s.body}>{t("wait")}</Text>
+    </NeoSurface>
   ) : query.isError ? (
     <>
-      <Text style={s.body}>{t("genericError")}</Text>
+      <NeoFeedback message={t("genericError")} tone="error" />
       <Button title={t("retry")} onPress={() => query.refetch()} />
     </>
   ) : !(query.data?.pages?.flat().length ?? query.data?.length) ? (
-    <Text style={s.body}>{t("empty")}</Text>
+    <NeoSurface compact>
+      <NeoStatusBadge label={t("empty")} />
+    </NeoSurface>
   ) : null;
 }
 function Activity({
@@ -1119,10 +1106,8 @@ function Activity({
                 {t("minutesLeft")}
               </Text>
             )}
-            <Text style={s.body}>
-              {t(a.status)}
-              {mode === "applicants" && a.worker_name ? ` · ${a.worker_name}` : ""}
-            </Text>
+            <NeoStatusBadge label={t(a.status)} status={a.status} />
+            {mode === "applicants" && a.worker_name && <Text style={s.label}>{a.worker_name}</Text>}
             {mode === "applicants" && (
               <Text style={s.body}>
                 {(a.skills || []).join(", ")} · {t("experience")}: {a.experience_years}
@@ -1614,11 +1599,13 @@ function Credits({ t }: { t: Translate }) {
           disabled={busy}
         />
       )}
-      {(config.isError || !testPaymentsAllowed(config.data)) && (
+      {!config.isPending && (config.isError || !testPaymentsAllowed(config.data)) && (
         <Text style={s.body}>{t("paymentUnavailable")}</Text>
       )}
       <Button
         title={t("continuePayment")}
+        loading={busy}
+        icon="credit-card"
         disabled={busy || !selected || !testPaymentsAllowed(config.data)}
         onPress={() => void buy()}
       />
@@ -1629,9 +1616,12 @@ function Credits({ t }: { t: Translate }) {
         onPress={() => void resume()}
       />
       {!!state && (
-        <Text accessibilityLiveRegion="polite" style={s.notice}>
-          {t(state)}
-        </Text>
+        <NeoFeedback
+          message={t(state)}
+          tone={
+            ["paymentFailed", "paymentVerificationFailed"].includes(state) ? "error" : "success"
+          }
+        />
       )}
       {config.isError && (
         <Button title={t("retry")} secondary onPress={() => void config.refetch()} />

@@ -1,10 +1,10 @@
+import { NeoModal as Modal, NeoIconButton } from "./ui";
 import React, { useRef, useState } from "react";
-import { ActivityIndicator, Linking, Modal, Platform, Pressable, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Linking, Platform, Text, View } from "react-native";
 import { deviceLocation, needsLocationExplanation } from "./device-location";
 import { locationErrorKey, type Position } from "./location-logic";
 import { locationStatus } from "./location-acquisition";
-import { Button, colors, styles as s } from "./ui";
+import { Button, styles as s } from "./ui";
 export default function CurrentLocationControl({
   t,
   onLocated,
@@ -83,29 +83,13 @@ export default function CurrentLocationControl({
           </View>
         </View>
       )}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t(busy ? "findingCurrentLocation" : "useCurrentLocation")}
-        accessibilityState={{ disabled: busy || explain, busy }}
+      <NeoIconButton
+        name="navigation"
+        label={t(busy ? "findingCurrentLocation" : "useCurrentLocation")}
         disabled={busy || explain}
+        loading={busy}
         onPress={() => void locate()}
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 13,
-          backgroundColor: colors.white,
-          alignItems: "center",
-          justifyContent: "center",
-          borderWidth: 1,
-          borderColor: colors.line,
-        }}
-      >
-        {busy ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : (
-          <Feather name="navigation" size={20} color={colors.accent} />
-        )}
-      </Pressable>
+      />
       <Modal visible={explain} transparent onRequestClose={() => setExplain(false)}>
         <View
           style={{

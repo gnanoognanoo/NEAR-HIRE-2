@@ -386,5 +386,15 @@
   "postingTitleError": "Enter a title with 3–120 characters.",
   "postingDescriptionError": "Describe the work in 10–3,000 characters.",
   "postingScheduleError": "Enter a work schedule (up to 200 characters).",
-  "postingLocalityError": "Enter your area with 2–120 characters."
+  "postingLocalityError": "Enter your area with 2–120 characters.",
+  "neoTagline": "Opportunity, closer to home.",
+  "neoWelcome": "YOUR NEXT CHAPTER",
+  "neoJobBasics": "The work",
+  "neoPaySchedule": "Pay & schedule",
+  "neoJobLocation": "Where the work happens",
+  "neoMoreDetails": "A few more details",
+  "neoUrgentHint": "Make urgent opportunities easy to spot.",
+  "neoDesignReview": "DEV · Soft UI review",
+  "neoChooseArea": "Start with your area",
+  "neoManualCoordinates": "Enter coordinates"
 }
