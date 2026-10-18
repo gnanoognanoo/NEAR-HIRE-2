@@ -47,3 +47,4 @@ test("filtered loaded counts exclude expiration and preserve bilingual radius/pl
 });
 
 import "./neo-tokens.test.ts";
+import "./update-logic.test.ts";

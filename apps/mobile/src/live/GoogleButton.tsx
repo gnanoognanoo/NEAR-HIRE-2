@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { googleAuth } from "./google-auth";
+import { criticalActivity } from "./update-logic";
 import { authErrorKey } from "./auth-logic";
 import { NeoFeedback, colors, styles as s } from "./ui";
 export default function GoogleButton({
@@ -28,6 +29,7 @@ export default function GoogleButton({
         ]}
         onPress={async () => {
           if (pending.current) return;
+          const releaseUpdateGuard = criticalActivity.begin();
           pending.current = true;
           setBusy(true);
           setError("");
@@ -43,6 +45,7 @@ export default function GoogleButton({
                   : key,
             );
           } finally {
+            releaseUpdateGuard();
             pending.current = false;
             setBusy(false);
           }

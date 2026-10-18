@@ -396,5 +396,20 @@
   "neoUrgentHint": "Make urgent opportunities easy to spot.",
   "neoDesignReview": "DEV · Soft UI review",
   "neoChooseArea": "Start with your area",
-  "neoManualCoordinates": "Enter coordinates"
+  "neoManualCoordinates": "Enter coordinates",
+  "otaSource": "Running from",
+  "otaDownloaded": "Downloaded update",
+  "otaEnabled": "OTA enabled",
+  "otaLastCheck": "Last update check",
+  "otaNotChecked": "Not checked this session",
+  "otaChecking": "Checking for a compatible update…",
+  "otaDownloading": "Downloading update…",
+  "otaReady": "Update downloaded. Restart when you have finished your work.",
+  "otaCurrent": "You have the latest compatible update.",
+  "otaFailed": "Update check, download or restart failed. Check your connection and retry.",
+  "otaBusy": "Finish your payment, publication or sign-in before restarting.",
+  "otaUnavailable": "OTA checks require the installed app; they are unavailable in web or development mode.",
+  "otaCheck": "Check for Updates",
+  "otaRestart": "Restart to Apply",
+  "otaEmergency": "The app recovered using an earlier update. Retry checking, and report the update ID if this continues."
 }

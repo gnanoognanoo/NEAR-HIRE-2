@@ -20,6 +20,8 @@ test("English and Tamil have matching nonempty translation keys", () => {
 test("literal live-screen translation references exist", () => {
   const source = [
     "LiveApp.tsx",
+    "AboutNearHire.tsx",
+    "UpdateManager.tsx",
     "AccountPanel.tsx",
     "JobSummary.tsx",
     "JobCreditBalance.tsx",

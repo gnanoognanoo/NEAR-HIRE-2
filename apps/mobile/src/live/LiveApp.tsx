@@ -1,5 +1,7 @@
 import PostWork from "./PostWork";
 import AboutNearHire from "./AboutNearHire";
+import { UpdateNotice } from "./UpdateManager";
+import { criticalActivity } from "./update-logic";
 import CreditBreakdown from "./CreditBreakdown";
 import { creditReasonKey } from "./credit-model";
 import PaymentPackages from "./PaymentPackages";
@@ -227,6 +229,7 @@ export default function LiveApp() {
     }
   }, [session?.user.id, profile.data]);
   const switchWorkspace = async (w: Workspace) => {
+    const releaseUpdateGuard = criticalActivity.begin();
     try {
       await rpc("set_workspace", { p_workspace: w });
       setWorkspace(w);
@@ -234,6 +237,8 @@ export default function LiveApp() {
       await qc.invalidateQueries({ queryKey: ["profile"] });
     } catch {
       setError("workspaceSaveError");
+    } finally {
+      releaseUpdateGuard();
     }
   };
   useEffect(() => {
@@ -274,6 +279,7 @@ export default function LiveApp() {
   const [creditOverlay, setCreditOverlay] = useState(false);
   const run: Run = async (fn, success = "success") => {
     if (busyRef.current) return;
+    const releaseUpdateGuard = criticalActivity.begin();
     busyRef.current = true;
     setBusy(true);
     setError("");
@@ -294,6 +300,7 @@ export default function LiveApp() {
             : authErrorKey(e),
       );
     } finally {
+      releaseUpdateGuard();
       busyRef.current = false;
       setBusy(false);
     }
@@ -553,6 +560,7 @@ export default function LiveApp() {
             ) : undefined
           }
         />
+        <UpdateNotice t={t} />
         <ScrollView
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={200}

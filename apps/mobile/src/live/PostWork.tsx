@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { NeoCard, NeoToggle, NeoStatusBadge, NeoFeedback, NeoOptionPicker } from "./ui";
 import { completedPostingDraft } from "./posting-flow";
+import { criticalActivity } from "./update-logic";
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -223,6 +224,7 @@ export default function PostWork({
     if (submitBusy.current) return;
     const parsed = parse();
     if (!parsed.success) return;
+    const releaseUpdateGuard = criticalActivity.begin();
     submitBusy.current = true;
     setBusy(true);
     setError("");
@@ -243,6 +245,7 @@ export default function PostWork({
         if (key === "creditsError") openCredits();
       }
     } finally {
+      releaseUpdateGuard();
       submitBusy.current = false;
       if (mounted.current) setBusy(false);
     }

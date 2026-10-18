@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text } from "react-native";
 import { authService } from "./services";
+import { criticalActivity } from "./update-logic";
 import { authErrorKey } from "./auth-logic";
 import { Button, NeoInput as TextInput, NeoFeedback, styles as s, colors } from "./ui";
 export default function PhoneAuth({
@@ -28,6 +29,7 @@ export default function PhoneAuth({
   }, [service]);
   async function perform(verify: boolean) {
     if (pending.current) return;
+    const releaseUpdateGuard = criticalActivity.begin();
     pending.current = true;
     setBusy(true);
     setError("");
@@ -47,6 +49,7 @@ export default function PhoneAuth({
       setError(authErrorKey(e));
       if (verify) setOtp("");
     } finally {
+      releaseUpdateGuard();
       pending.current = false;
       setBusy(false);
       setRemaining(service.remaining());

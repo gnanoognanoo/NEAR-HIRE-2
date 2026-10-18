@@ -3,7 +3,8 @@ import * as Crypto from "expo-crypto";
 import { backend, edge, storage } from "./client";
 import { openCheckout } from "./checkout";
 import { createPaymentFlow } from "./payment-flow";
-export const paymentFlow = createPaymentFlow({
+import { criticalActivity } from "./update-logic";
+const flow = createPaymentFlow({
   storage,
   userId: async () => {
     const { data, error } = await backend().auth.getUser();
@@ -27,3 +28,22 @@ export const paymentFlow = createPaymentFlow({
     return data.status;
   },
 });
+// Includes native checkout and server verification, even when the credits screen is hidden.
+export const paymentFlow = {
+  async buy(...args: Parameters<typeof flow.buy>) {
+    const release = criticalActivity.begin();
+    try {
+      return await flow.buy(...args);
+    } finally {
+      release();
+    }
+  },
+  async recover() {
+    const release = criticalActivity.begin();
+    try {
+      return await flow.recover();
+    } finally {
+      release();
+    }
+  },
+};
