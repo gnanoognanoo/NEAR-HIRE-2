@@ -17,20 +17,31 @@ try {
   $env:EXPO_PUBLIC_DEMO_MODE = 'false'
   $env:EXPO_PUBLIC_UI_PREVIEW = 'false'
   $env:EXPO_PUBLIC_PAYMENT_TEST_AUTH = 'false'
+  # Windows PowerShell treats normal EAS stderr progress as an error with Stop.
+  # Check the native exit code explicitly; never mix progress into JSON output.
+  $ErrorActionPreference = 'Continue'
   $buildRaw = & npx eas-cli build:view $BuildId --json 2>$null
-  if ($LASTEXITCODE -ne 0) { throw 'Cannot verify target build.' }
+  $commandExit = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($commandExit -ne 0) { throw 'Cannot verify target build.' }
   $build = ($buildRaw -join "`n") | ConvertFrom-Json
   if ($build.status -ne 'FINISHED' -or $build.appIdentifier -ne 'app.nearhire.mobile.preview' -or $build.updateChannel.name -ne 'preview') {
     throw 'Target must be a finished NearHire Preview APK on the preview channel.'
   }
+  $ErrorActionPreference = 'Continue'
   $fingerprintRaw = & npx eas-cli fingerprint:generate --build-profile preview --platform android --json --non-interactive 2>$null
-  if ($LASTEXITCODE -ne 0) { throw 'Cannot verify native compatibility.' }
+  $commandExit = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($commandExit -ne 0) { throw 'Cannot verify native compatibility.' }
   $fingerprint = ($fingerprintRaw -join "`n") | ConvertFrom-Json
   if ($fingerprint.hash -ne $build.runtime.version) {
     throw 'Native fingerprint differs from the APK. Do not publish or override runtime; inspect native changes.'
   }
-  & npx eas-cli update --channel preview --platform android --environment preview --message $Message --non-interactive
-  if ($LASTEXITCODE -ne 0) { throw 'Preview update failed.' }
+  $ErrorActionPreference = 'Continue'
+  & npx eas-cli update --channel preview --platform android --environment preview --message $Message --non-interactive 2>$null
+  $commandExit = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($commandExit -ne 0) { throw 'Preview update failed.' }
 } finally {
   Pop-Location
   foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
