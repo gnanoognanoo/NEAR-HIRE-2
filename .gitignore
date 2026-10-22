@@ -43,6 +43,7 @@ out/
 .DS_Store
 .claude/
 /apps/mobile/dist-auth-android/
+/apps/mobile/dist-android/
 
 # Generated from the installed MapLibre package when Metro starts
 /apps/mobile/public/maplibre/

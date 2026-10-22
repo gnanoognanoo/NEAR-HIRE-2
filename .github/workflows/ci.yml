@@ -1,5 +1,7 @@
 name: NearHire checks
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -21,7 +23,45 @@ jobs:
       - run: npm test
       - run: npm run test:db
       - run: npm run build
+      - run: npm run export:android
+      - run: node scripts/scan-update.cjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - run: deno test --config supabase/functions/deno.json supabase/functions/_shared/runtime_test.ts supabase/functions/location/provider_test.ts
+      - run: deno check --config supabase/functions/deno.json supabase/functions/*/index.ts
+  preview-update:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.NEARHIRE_PREVIEW_OTA_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: preview
+    concurrency:
+      group: nearhire-preview-ota
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+            apps/admin/package-lock.json
+      - run: npm ci && npm --prefix apps/mobile ci && npm --prefix apps/admin ci
+      - name: Prepare external Preview Firebase configuration
+        env:
+          FIREBASE_ANDROID_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_PREVIEW }}
+        run: |
+          node -e 'const fs=require("fs"),p=require("path"); if(!process.env.FIREBASE_ANDROID_JSON) throw Error("Configure GOOGLE_SERVICES_JSON_PREVIEW in the preview GitHub environment"); fs.writeFileSync(p.join(process.env.RUNNER_TEMP,"google-services-preview.json"),process.env.FIREBASE_ANDROID_JSON,{mode:0o600});'
+      - name: Publish tested compatible Android update to preview only
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PREVIEW_BUILD_ID: ${{ vars.NEARHIRE_PREVIEW_BUILD_ID }}
+          NEARHIRE_VERIFIED_COMMIT: ${{ github.sha }}
+        run: |
+          test -n "$EXPO_TOKEN" && test -n "$PREVIEW_BUILD_ID"
+          npm run update:preview -- --build-id "$PREVIEW_BUILD_ID" --google-services "$RUNNER_TEMP/google-services-preview.json" --message "Tested preview ${GITHUB_SHA}"
+      - name: Remove temporary Firebase configuration
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/google-services-preview.json"

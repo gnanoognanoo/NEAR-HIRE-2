@@ -23,6 +23,16 @@ export function createActivityGate() {
 }
 export const criticalActivity = createActivityGate();
 
+/** Release apps download quietly; restart stays deliberate during an active session. */
+export function shouldAutoCheck(input: {
+  development: boolean; web: boolean; enabled: boolean; channel: string | null;
+  active: boolean; busy: boolean; now: number; lastCheck: number;
+}) {
+  return !input.development && !input.web && input.enabled &&
+    (input.channel === "preview" || input.channel === "production") &&
+    input.active && !input.busy && (input.lastCheck === 0 || input.now - input.lastCheck >= 15 * 60 * 1000);
+}
+
 export type UpdateResult =
   | "otaNotChecked"
   | "otaChecking"

@@ -3,7 +3,12 @@
   "private": true,
   "scripts": {
     "check": "npm --prefix apps/mobile run check && npm --prefix apps/admin run check",
-    "test": "npm --prefix apps/mobile test && node --test tests/localization.mjs",
+    "test": "node scripts/test-mobile.cjs && node --test tests/localization.mjs tests/update-workflow.cjs",
+    "start:dev": "node scripts/start-development.cjs",
+    "update:preview": "node scripts/publish-update.cjs --channel preview",
+    "update:production": "node scripts/publish-update.cjs --channel production",
+    "export:android": "node scripts/export-android.cjs",
+    "validate:updates": "npm run lint && npm run check && npm test && npm run test:db && npm run build && npm run export:android && node scripts/scan-update.cjs",
     "build": "npm --prefix apps/mobile run build:web && npm --prefix apps/admin run build",
     "format": "prettier --write .",
     "lint": "eslint apps/mobile/src/live apps/mobile/src/dev apps/mobile/App.tsx apps/mobile/ProductionApp.tsx apps/admin/app packages --max-warnings 0",

@@ -13,6 +13,8 @@ Android-first local work marketplace with a white-first interface and restrained
 
 ## Development
 
+For Android Fast Refresh, Preview OTA, production safety and test-gated CI, see [the complete Android update workflow](docs/android-updates.md). Use `npm run start:dev` from the repository root for the existing development client.
+
 Install Node 22 or newer, then run from the repository root:
 
 ```powershell

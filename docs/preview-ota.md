@@ -1,5 +1,7 @@
 # Friend testing and OTA updates
 
+The current commands, CI setup, production separation and 22 October delivery diagnosis are in [Android update workflow](android-updates.md). The guarded publisher now validates/tests before uploading; use `-CheckOnly` on the PowerShell wrapper for a read-only compatibility check.
+
 The preview profile builds a standalone internally distributed Android APK for app.nearhire.mobile.preview (NearHire Preview). It uses the existing EAS project and the preview environment/channel. Development remains a dev-client workflow. Production uses its own production channel and is not published by this workflow.
 
 Testers install the APK once; Metro, Expo Go and developer tools are not required. Preview and development install side by side. Development remains app.nearhire.mobile and nearhire://auth/callback; preview uses nearhire-preview://auth/callback. Browser Google OAuth still uses the existing Supabase Web OAuth client, not a native Google sign-in SDK.

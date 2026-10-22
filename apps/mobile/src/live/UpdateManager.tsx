@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 import { AppState, Platform, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Updates from "expo-updates";
-import { createUpdateController, criticalActivity, type UpdateResult } from "./update-logic";
+import { createUpdateController, criticalActivity, shouldAutoCheck, type UpdateResult } from "./update-logic";
 import { Button, NeoFeedback, styles as s } from "./ui";
 
 const UpdateContext = createContext<{
@@ -62,27 +62,22 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
   useEffect(() => {
-    if (__DEV__ || Platform.OS === "web" || Updates.channel !== "preview" || !Updates.isEnabled)
-      return;
     const check = () => {
       const n = current.current;
-      if (
-        AppState.currentState !== "active" ||
-        n.isStartupProcedureRunning ||
-        n.isChecking ||
-        n.isDownloading ||
-        Date.now() - lastAutoCheck.current < 15 * 60 * 1000
-      )
-        return;
+      if (!shouldAutoCheck({ development: __DEV__, web: Platform.OS === "web", enabled: Updates.isEnabled,
+        channel: Updates.channel, active: AppState.currentState === "active",
+        busy: checking.current || n.isStartupProcedureRunning || n.isChecking || n.isDownloading || n.isRestarting,
+        now: Date.now(), lastCheck: lastAutoCheck.current })) return;
       lastAutoCheck.current = Date.now();
       checking.current = true;
-      void controller.current!.check();
+      void controller.current!.check().finally(() => { checking.current = false; });
     };
     check();
+    const timer = setInterval(check, 60 * 1000);
     const listener = AppState.addEventListener("change", (state) => {
       if (state === "active") check();
     });
-    return () => listener.remove();
+    return () => { clearInterval(timer); listener.remove(); };
   }, [native.isStartupProcedureRunning]);
   const busy =
     native.isStartupProcedureRunning ||
@@ -102,7 +97,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
         check: async () => {
           if (!busy) {
             checking.current = true;
-            await controller.current!.check();
+            try { await controller.current!.check(); } finally { checking.current = false; }
           }
         },
         restart: () => controller.current!.restart(),

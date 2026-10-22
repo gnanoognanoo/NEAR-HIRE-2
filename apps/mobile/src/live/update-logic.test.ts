@@ -1,6 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createActivityGate, createUpdateController, type UpdateResult } from "./update-logic.ts";
+import { createActivityGate, createUpdateController, shouldAutoCheck, type UpdateResult } from "./update-logic.ts";
+
+test("Automatic OTA checks run in active preview/production release apps and respect throttle", () => {
+  const ready = { development: false, web: false, enabled: true, channel: "preview", active: true,
+    busy: false, now: 2_000_000, lastCheck: 0 };
+  assert.equal(shouldAutoCheck(ready), true);
+  assert.equal(shouldAutoCheck({ ...ready, channel: "production" }), true);
+  for (const change of [{ development: true }, { web: true }, { enabled: false }, { channel: null },
+    { active: false }, { busy: true }, { lastCheck: ready.now - 899_999 }])
+    assert.equal(shouldAutoCheck({ ...ready, ...change }), false);
+  assert.equal(shouldAutoCheck({ ...ready, lastCheck: ready.now - 900_000 }), true);
+});
 
 function setup() {
   const gate = createActivityGate();
