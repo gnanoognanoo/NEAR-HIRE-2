@@ -9,9 +9,10 @@
       "environment": "development",
       "distribution": "internal",
       "env": {
+        "APP_VARIANT": "development",
         "EXPO_PUBLIC_DEMO_MODE": "false",
         "EXPO_PUBLIC_UI_PREVIEW": "false",
-        "EXPO_PUBLIC_PAYMENT_TEST_AUTH": "true"
+        "EXPO_PUBLIC_PAYMENT_TEST_AUTH": "false"
       },
       "android": {
         "buildType": "apk"

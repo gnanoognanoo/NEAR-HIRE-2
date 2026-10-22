@@ -51,3 +51,24 @@ test('Production publisher fails closed in CI before touching EAS',()=>{
   assert.notEqual(r.status,0);
   assert.match(r.stderr,/CI production publishing is disabled/);
 });
+test('Development native config preserves app identity, Firebase injection and live-mode flags',()=>{
+  const {spawnSync}=require('node:child_process');
+  const script=`const base=require('./apps/mobile/app.json').expo;
+    const config=require('./apps/mobile/app.config.js')({config:base});
+    console.log(JSON.stringify({name:config.name,scheme:config.scheme,android:config.android.package,
+      firebase:config.android.googleServicesFile,project:config.extra.eas.projectId,plugins:config.plugins}));`;
+  for(const variant of ['development','preview']) {
+    const result=spawnSync(process.execPath,['-e',script],{cwd:root,encoding:'utf8',env:{...process.env,
+      APP_VARIANT:variant,EAS_PROJECT_ID:PROJECT_ID,GOOGLE_SERVICES_JSON:'/external/client-config.json'}});
+    assert.equal(result.status,0);
+    const config=JSON.parse(result.stdout);
+    assert.equal(config.android,variant==='preview'?'app.nearhire.mobile.preview':'app.nearhire.mobile');
+    assert.equal(config.scheme,variant==='preview'?'nearhire-preview':'nearhire');
+    assert.equal(config.firebase,'/external/client-config.json');assert.equal(config.project,PROJECT_ID);
+    assert.deepEqual(config.plugins,base.plugins);
+  }
+  assert.equal(profiles.development.env.APP_VARIANT,'development');
+  assert.equal(profiles.development.env.EXPO_PUBLIC_DEMO_MODE,'false');
+  assert.equal(profiles.development.env.EXPO_PUBLIC_PAYMENT_TEST_AUTH,'false');
+  assert.equal(profiles.development.android.buildType,'apk');
+});
