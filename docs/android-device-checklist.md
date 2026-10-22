@@ -2,7 +2,7 @@
 
  NearHire Android development test checklist
 
-Status: PENDING. No APK or physical-device result has been verified.
+Current status (22 October 2026): development APK build and host-side checks verified; physical-device results PENDING because ADB detects no device. See [the current Android test report](android-test-report.md). Dated sections below retain historical results.
 
 ## Build prerequisites
 
