@@ -45,7 +45,7 @@ export default function CurrentLocationControl({
     }
   }
   return (
-    <View style={{ alignItems: "flex-end", gap: 8, flexShrink: 1, minWidth: 44 }}>
+    <View style={{ alignItems: "flex-end", gap: 8, flexShrink: 0, minWidth: 44 }}>
       {!!status && !error && (
         <Text accessibilityLiveRegion="polite" style={[s.body, { maxWidth: 210 }]}>
           {status}

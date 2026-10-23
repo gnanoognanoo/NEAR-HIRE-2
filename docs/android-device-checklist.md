@@ -2,7 +2,7 @@
 
  NearHire Android development test checklist
 
-Current status (22 October 2026): development APK build and host-side checks verified; physical-device results PENDING because ADB detects no device. See [the current Android test report](android-test-report.md). Dated sections below retain historical results.
+Current status (23 October 2026): physical Android smoke testing passed for startup, Metro/Fast Refresh, observed English/Tamil UI, maps, GPS, navigation, local draft input and session restoration. Extended end-to-end cases remain pending. See [the current Android test report](android-test-report.md) for exact coverage and limits. Dated sections below retain historical results.
 
 ## Build prerequisites
 

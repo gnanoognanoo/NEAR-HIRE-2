@@ -3,14 +3,7 @@ import { NeoCard, NeoToggle, NeoStatusBadge, NeoFeedback, NeoOptionPicker } from
 import { completedPostingDraft } from "./posting-flow";
 import { criticalActivity } from "./update-logic";
 import React, { useEffect, useState, useRef } from "react";
-import {
-  Text,
-  View,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Keyboard,
-  Platform,
-} from "react-native";
+import { Text, View, ActivityIndicator, Keyboard } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { storage } from "./client";
@@ -273,11 +266,7 @@ export default function PostWork({
       </View>
     );
   return (
-    <KeyboardAvoidingView
-      enabled={active}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ gap: 20 }}
-    >
+    <View style={{ gap: 20 }}>
       <View pointerEvents={busy ? "none" : "auto"} style={{ gap: 20 }}>
         <Text style={s.title}>{t("post")}</Text>
         <Text style={s.body}>{t("postingNote")}</Text>
@@ -536,6 +525,6 @@ export default function PostWork({
           </NeoCard>
         )}
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

@@ -1,4 +1,66 @@
-# Android development test report — 22 October 2026
+# Physical Android smoke test — 23 October 2026
+
+## Result
+
+PHYSICAL SMOKE TEST PASSED for the checks recorded below. Extended end-to-end tests remain pending; this is not a production-readiness claim.
+
+Device: vivo V2204, Android 12, default font scale 1.0. ADB initially reported unauthorized; the owner approved USB debugging. The verified development APK was installed successfully with `adb install -r`, without clearing app data. USB reverse connects the app to Metro on port 8081. One real `app.nearhire.mobile` inspector target is connected after a cold restart.
+
+APK build: `ac22ccd3-3c58-4f70-a26b-bff9515f3f02`, original source `e3faedcc2c0016819025978517b308ed1a7a38cf`, package `app.nearhire.mobile`. The APK was not rebuilt. It serves the current working source and fixes through Metro; its original native build revision is unchanged. Download, signature, runtime and module evidence is retained in the dated host-only report below.
+
+## Reproduced problems and fixes
+
+1. White Android status-bar text was unreadable on the light NearHire canvas. `apps/mobile/App.tsx` now mounts the already-installed Expo StatusBar with dark text. The change appeared on the physical phone through refresh.
+2. The Tamil GPS-disabled error card compressed its recovery controls inside the bounded location panel. `CurrentLocationControl.tsx` no longer shrinks that card. Scrolling exposed Retry, Open Settings and manual selection; Open Settings successfully opened Android Location settings.
+3. The shared page ScrollView retained a previous screen's deep scroll offset. Opening Settings from a scrolled Profile began in the middle of Settings. `LiveApp.tsx` resets the existing ScrollView on screen/workspace changes without remounting it. Opening Profile from the bottom of a long job form now showed its title and top controls.
+4. The keyboard covered the focused job-title input on this Android phone. Keyboard avoidance now surrounds the page viewport in `LiveApp.tsx`, using height on Android and padding on iOS. The nested job-form-only wrapper in `PostWork.tsx` was removed. The settled phone screen showed the focused input and cursor above the keyboard. No new dependency or native configuration was introduced.
+
+## Actual physical-device results
+
+| Check | Result and limits |
+| --- | --- |
+| Install and startup | PASS; supplied APK installed and launched, latest neumorphic UI visible |
+| Metro connection | PASS; USB reverse, Android bundle loads, real React Native inspector target connected |
+| Fast Refresh | PASS; the status-bar/layout source fixes reached the running phone without reinstalling |
+| English/Tamil | PASS for language selection, login, location feedback and observed navigation/form text; not every translation screen was visually tested |
+| Authentication/session | Existing real authenticated profile/home loaded; cold force-stop and relaunch restored authenticated Post Work home and the displayed 12-credit balance; no bypass or fixture session |
+| New-user onboarding / real OTP | NOT RUN in this attempt; no fresh account was provisioned and no OTP was captured or requested intentionally |
+| Navigation | PASS for Find Work home, Profile, Settings, Post Work switch/home, category picker, back/reopen and return to Profile |
+| Native map | PASS; MapLibre rendered OpenFreeMap tiles and attribution in the location picker |
+| GPS permission | PASS; Android prompt shown, owner granted precise location; fine/coarse grants confirmed |
+| GPS disabled/recovery | PASS; disabled-service feedback displayed, repaired Settings action opened Android settings, fresh retry obtained a fix with about 14 m reported accuracy |
+| Reverse/address lookup | UNAVAILABLE; app showed localized provider-unavailable feedback while retaining a usable GPS/manual point; no provider credentials changed |
+| Manual map selection | PASS; tapping map changed point status to selected location; no coordinates or address published |
+| Residential form | PASS for opening, real category options/selection, title input, scrolling and keyboard focus |
+| Business form | PASS for switching/rendering; business/display-name field present; full valid submission not run |
+| Local draft preservation | PASS; temporary title persisted after Back and reopening. Test title was removed afterward. Only local draft selection metadata remained; no server draft was saved |
+| Missing required fields | PASS; incomplete Publish attempt produced validation feedback, did not open successful publication, and displayed balance remained 12 |
+| Crash/runtime monitoring | No NearHire crash-buffer entry or matching JavaScript/native fatal exception observed during the smoke test; this does not prove absence of all future crashes |
+
+The owner may have completed interactive authentication while testing. This report confirms the real protected UI and restored session, not a separately audited new Google-account provisioning/duplicate-credit test. No passwords, OTPs, session tokens, precise GPS coordinates or device identifiers are recorded here.
+
+## Automated validation after fixes
+
+- Mobile/admin TypeScript: PASS.
+- ESLint: PASS.
+- 131 mobile tests plus 8 localization/update-workflow tests: PASS, zero failures.
+- 63 local database/PostGIS integration scenarios: PASS; real PostGIS with mocked Auth identities and cron registration. These are not hosted-database/device end-to-end results.
+- Final Android/Hermes export: PASS. The first sandboxed attempt could not write the compiler's temporary bytecode file; rerunning with filesystem access succeeded.
+- Tracked source and final decoded Android-bundle secret scan: PASS; external private-value comparison found no matches in source.
+- Whitespace/diff inspection: PASS. Only the four UI files above and test documentation changed.
+
+## Remaining tests and operating state
+
+Real phone OTP delivery, new-account profile creation, permission denial/permanent-denial branches, manual coordinate text entry, complete valid job publication/credit debit/map visibility, FCM token registration/delivery and native Razorpay TEST checkout are DEVICE TEST PENDING. No live job, purchased-credit transaction or payment was submitted. The account's UI language was changed to English and its workspace to Post Work through normal controls during testing; authentication identity and credentials were preserved.
+
+The phone is left on the authenticated Post Work home, connected to the development server. Metro launcher: `npm run start:dev -- --port 8081` from `C:\PROJECTS\NEAR HIRE`; reuse the existing running instance. Demo/gallery/payment-test-login flags remain off. No APK rebuild, OTA upload, production deployment, Play submission, Supabase configuration change, Firebase configuration change or payment-mode change was performed.
+
+---
+
+# Historical host-only attempt — 22 October 2026
+
+The following records the earlier attempt, before this phone was connected. Its no-device statements apply only to that dated attempt.
+
 
 ## Result
 

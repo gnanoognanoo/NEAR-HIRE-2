@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from "react";
 import { ActivityIndicator, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { NeoThemeProvider, NeoHeader, colors } from "./src/live/ui";
 // DEV gallery never imports the live client or creates an authenticated session.
 // Release exports disable this branch regardless of environment flags.
@@ -12,6 +13,7 @@ const Root =
 export default function App() {
   return (
     <NeoThemeProvider>
+      <StatusBar style="dark" />
       <Suspense
         fallback={
           <View

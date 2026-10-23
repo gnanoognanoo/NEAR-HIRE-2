@@ -34,6 +34,7 @@ import {
   ActivityIndicator,
   BackHandler,
   Linking,
+  KeyboardAvoidingView,
   ScrollView,
   Text,
   View,
@@ -115,6 +116,7 @@ function Feedback() {
   );
 }
 export default function LiveApp() {
+  const pageScroll = useRef<ScrollView>(null);
   const loadNextJobs = useRef<() => void>(() => {});
   const busyRef = useRef(false);
   const qc = useQueryClient();
@@ -133,6 +135,12 @@ export default function LiveApp() {
   const [position, setPosition] = useState<Position | null>(null);
   const [postingPosition, setPostingPosition] = useState<Position | null>(null);
   const [locationOpen, setLocationOpen] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() =>
+      pageScroll.current?.scrollTo({ y: 0, animated: false }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [screen, workspace]);
   const t: Translate = (k) =>
     (language === "ta" ? ta : en)[k as keyof typeof en] || en[k as keyof typeof en] || k;
   useEffect(() => {
@@ -550,80 +558,89 @@ export default function LiveApp() {
           </SafeAreaView>
         </Modal>
       )}
-      <SafeAreaView style={s.page}>
-        <NeoHeader
-          title={t("brand")}
-          subtitle={t(workspace === "post" ? "post" : workspace === "find" ? "find" : "neoTagline")}
-          trailing={
-            session && workspace === "post" ? (
-              <LiveCreditChip t={t} onOpen={() => setScreen("credits")} />
-            ) : undefined
-          }
-        />
-        <UpdateNotice t={t} />
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          scrollEventThrottle={200}
-          onScroll={({ nativeEvent: e }) => {
-            if (
-              screen === "jobs" &&
-              e.layoutMeasurement.height + e.contentOffset.y >= e.contentSize.height - 350
-            )
-              loadNextJobs.current();
-          }}
-          style={{ flex: 1 }}
-          contentContainerStyle={[
-            s.content,
-            ["jobs", "workers"].includes(screen) &&
-            workspace &&
-            session &&
-            profileComplete(profile.data)
-              ? { flex: 1, padding: 0, gap: 0 }
-              : {},
-          ]}
-        >
-          {!!error && <NeoFeedback message={t(error)} tone="error" />}
-          {!!message && <NeoFeedback message={t(message)} />}
-          {busy && <ActivityIndicator color={colors.accent} />}
-          {content}
-        </ScrollView>
-        {!!session && !!workspace && profileComplete(profile.data) && (
-          <NeoBottomNavigation
-            items={workspaceTabs(workspace!).map((k) => ({ id: k, label: t(routeLabel(k)) }))}
-            selected={
-              ["credits", "settings", "preferences", "loginSecurity", "editProfile"].includes(
-                screen,
-              )
-                ? "profile"
-                : screen === "post"
-                  ? "posts"
-                  : screen
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        enabled={Platform.OS !== "web"}
+      >
+        <SafeAreaView style={s.page}>
+          <NeoHeader
+            title={t("brand")}
+            subtitle={t(
+              workspace === "post" ? "post" : workspace === "find" ? "find" : "neoTagline",
+            )}
+            trailing={
+              session && workspace === "post" ? (
+                <LiveCreditChip t={t} onOpen={() => setScreen("credits")} />
+              ) : undefined
             }
-            onSelect={(k) => {
-              setScreen(k);
-              setError("");
-              setMessage("");
-            }}
           />
-        )}
-        <Modal visible={locationOpen} onRequestClose={() => setLocationOpen(false)}>
-          <SafeAreaView style={s.page}>
-            <View style={{ flex: 1 }}>
-              <Feedback />
-              <Button title={t("close")} secondary onPress={() => setLocationOpen(false)} />
-              <LocationPicker
-                t={t}
-                initial={screen === "post" ? postingPosition : position}
-                onSelect={(p) => {
-                  if (screen === "post") setPostingPosition(p);
-                  else setPosition(p);
-                  setLocationOpen(false);
-                }}
-              />
-            </View>
-          </SafeAreaView>
-        </Modal>
-      </SafeAreaView>
+          <UpdateNotice t={t} />
+          <ScrollView
+            ref={pageScroll}
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={200}
+            onScroll={({ nativeEvent: e }) => {
+              if (
+                screen === "jobs" &&
+                e.layoutMeasurement.height + e.contentOffset.y >= e.contentSize.height - 350
+              )
+                loadNextJobs.current();
+            }}
+            style={{ flex: 1 }}
+            contentContainerStyle={[
+              s.content,
+              ["jobs", "workers"].includes(screen) &&
+              workspace &&
+              session &&
+              profileComplete(profile.data)
+                ? { flex: 1, padding: 0, gap: 0 }
+                : {},
+            ]}
+          >
+            {!!error && <NeoFeedback message={t(error)} tone="error" />}
+            {!!message && <NeoFeedback message={t(message)} />}
+            {busy && <ActivityIndicator color={colors.accent} />}
+            {content}
+          </ScrollView>
+          {!!session && !!workspace && profileComplete(profile.data) && (
+            <NeoBottomNavigation
+              items={workspaceTabs(workspace!).map((k) => ({ id: k, label: t(routeLabel(k)) }))}
+              selected={
+                ["credits", "settings", "preferences", "loginSecurity", "editProfile"].includes(
+                  screen,
+                )
+                  ? "profile"
+                  : screen === "post"
+                    ? "posts"
+                    : screen
+              }
+              onSelect={(k) => {
+                setScreen(k);
+                setError("");
+                setMessage("");
+              }}
+            />
+          )}
+          <Modal visible={locationOpen} onRequestClose={() => setLocationOpen(false)}>
+            <SafeAreaView style={s.page}>
+              <View style={{ flex: 1 }}>
+                <Feedback />
+                <Button title={t("close")} secondary onPress={() => setLocationOpen(false)} />
+                <LocationPicker
+                  t={t}
+                  initial={screen === "post" ? postingPosition : position}
+                  onSelect={(p) => {
+                    if (screen === "post") setPostingPosition(p);
+                    else setPosition(p);
+                    setLocationOpen(false);
+                  }}
+                />
+              </View>
+            </SafeAreaView>
+          </Modal>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </FeedbackContext.Provider>
   );
 }
