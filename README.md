@@ -53,3 +53,5 @@ See `docs/production-readiness.md` for the current gaps and `docs/deployment.md`
 
 Task 3 location, map, privacy and notification setup/testing is documented in docs/location-and-notifications.md.
 
+Task 4 Ola address search, secure server-key setup and verified provider status: [docs/address-search.md](docs/address-search.md).
+

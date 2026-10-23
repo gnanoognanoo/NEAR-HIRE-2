@@ -1,5 +1,7 @@
 > Current basemap: keyless OpenFreeMap. See [open map architecture](open-map-architecture.md). Historical credential instructions below are superseded; EXPO_PUBLIC_MAP_STYLE_URL is no longer consumed.
 
+> Task 4 (23 October): [address search](address-search.md) records the current Ola credential blocker, forward-geocoding support and physical fallback test. Maps/GPS work independently of address-search availability.
+
 > Current EAS linkage and build status: [Task 3A release configuration](release-configuration.md). Earlier setup observations below are historical.
 
 # Task 3 — Location and notifications

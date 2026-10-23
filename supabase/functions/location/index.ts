@@ -1,16 +1,41 @@
-import {actor,env,handle,json,reply} from '../_shared/runtime.ts';
-import {OlaMapsProvider} from './provider.ts';
-const cache=new Map<string,{expires:number;data:unknown}>();
-handle(async req=>{
- const {client,user}=await actor(req);const {error}=await client.rpc('edge_rate_limit',{p_kind:'location'});if(error)return reply({error:'LOCATION_RATE_LIMIT'},429);
- const p=await json(req);if(Deno.env.get('LOCATION_PROVIDER') && Deno.env.get('LOCATION_PROVIDER')!=='ola')return reply({error:'LOCATION_UNAVAILABLE'},503);
- const provider=new OlaMapsProvider(env('OLA_MAPS_API_KEY'));let operation:()=>Promise<unknown>;let key:string;
- if(p.action==='search'&&typeof p.query==='string'&&p.query.trim().length>=3&&p.query.length<=120){key='s:'+p.query.trim().toLowerCase();operation=()=>provider.search(p.query.trim());}
- else if(p.action==='resolve'&&typeof p.id==='string'&&p.id.length>0&&p.id.length<500){key='p:'+p.id;operation=()=>provider.resolve(p.id);}
- else if(p.action==='reverse'&&Number.isFinite(p.latitude)&&Math.abs(p.latitude)<=90&&Number.isFinite(p.longitude)&&Math.abs(p.longitude)<=180){key='r:'+p.latitude+','+p.longitude;operation=()=>provider.reverse(p.latitude,p.longitude);}
- else return reply({error:'INVALID_LOCATION_QUERY'},400);
- // User-scoped, bounded, short-lived cache; no persistent exact-address logs.
- key=user.id+':'+key;const hit=cache.get(key);if(hit&&hit.expires>Date.now())return reply(hit.data);
- try {const data=await operation();if(cache.size>=200)cache.clear();cache.set(key,{expires:Date.now()+300000,data});return reply(data);}
- catch{return reply({error:'LOCATION_UNAVAILABLE'},503);}
+import { actor, handle, json, reply } from "../_shared/runtime.ts";
+import { OlaMapsProvider } from "./provider.ts";
+import { locationFailure, locationRequest } from "./request.ts";
+const cache = new Map<string, { expires: number; data: unknown }>();
+handle(async (req) => {
+  // Authenticate and enforce the existing server-side budget even for cached results.
+  const { client, user } = await actor(req);
+  const { error } = await client.rpc("edge_rate_limit", { p_kind: "location" });
+  if (error) return reply({ error: "LOCATION_RATE_LIMIT" }, 429);
+  const payload = await json(req),
+    key = Deno.env.get("OLA_MAPS_API_KEY")?.trim();
+  if (!key || (Deno.env.get("LOCATION_PROVIDER") && Deno.env.get("LOCATION_PROVIDER") !== "ola"))
+    return reply({ error: "LOCATION_NOT_CONFIGURED" }, 503);
+  let request;
+  try {
+    request = locationRequest(payload, new OlaMapsProvider(key));
+  } catch {
+    return reply({ error: "INVALID_LOCATION_QUERY" }, 400);
+  }
+  // Bounded, user-scoped in-memory cache; no address, query or coordinates in logs.
+  const cacheKey = JSON.stringify([user.id, request.key]),
+    hit = cache.get(cacheKey);
+  if (hit && hit.expires > Date.now()) return reply(hit.data);
+  try {
+    const data = await request.operation();
+    if (cache.size >= 200) cache.clear();
+    cache.set(cacheKey, { expires: Date.now() + 300000, data });
+    return reply(data);
+  } catch (error) {
+    const failure = locationFailure(error);
+    console.error(
+      JSON.stringify({
+        event: "location_provider_failed",
+        action: request.action,
+        code: failure.code,
+        http_status: failure.providerStatus,
+      }),
+    );
+    return reply({ error: failure.code }, failure.status);
+  }
 });

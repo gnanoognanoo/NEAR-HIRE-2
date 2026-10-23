@@ -131,6 +131,7 @@ export type Place = {
 export const locationService = {
   gps: deviceLocation,
   search: (query: string) => edge<Place[]>("location", { action: "search", query }),
+  geocode: (query: string) => edge<Place[]>("location", { action: "geocode", query }),
   resolve: (id: string) => edge<Place>("location", { action: "resolve", id }),
   reverse: (latitude: number, longitude: number) =>
     edge<Place>("location", { action: "reverse", ...coordinates(latitude, longitude) }),

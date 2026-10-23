@@ -64,6 +64,10 @@ export function locationErrorKey(e: unknown) {
         LOCATION_TIMEOUT: "gpsTimeout",
         INVALID_LOCATION: "invalidLocation",
         LOCATION_RATE_LIMIT: "locationRateLimit",
+        LOCATION_NOT_FOUND: "noPlaces",
+        LOCATION_NOT_CONFIGURED: "locationUnavailable",
+        LOCATION_PROVIDER_AUTH: "locationUnavailable",
+        LOCATION_INVALID_RESPONSE: "locationUnavailable",
       } as Record<string, string>
     )[code] || "locationUnavailable"
   );

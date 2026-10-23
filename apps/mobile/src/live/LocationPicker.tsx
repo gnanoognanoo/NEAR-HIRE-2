@@ -7,6 +7,7 @@ import { boundedLocation, coordinates, locationErrorKey, type Position } from ".
 import { locationStatus } from "./location-acquisition";
 import CurrentLocationControl from "./CurrentLocationControl";
 import LocationPin from "./LocationPin";
+import { mergeReverseLocation, resolveLocationSuggestion } from "./location-selection";
 export default function LocationPicker({
   t,
   onSelect,
@@ -30,41 +31,57 @@ export default function LocationPicker({
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [searchMode, setSearchMode] = useState<"search" | "geocode">("search");
   const revision = useRef(0);
   const cache = useRef(new Map<string, { time: number; data: Place[] }>());
   useEffect(() => {
     let alive = true;
-    const id = setTimeout(async () => {
-      if (query.trim().length < 3) {
-        setPlaces([]);
-        setSearched(false);
-        setSearching(false);
-        return;
-      }
-      const key = query.trim();
-      setSearching(true);
-      setError("");
-      try {
-        const hit = cache.current.get(key);
-        const data =
-          hit && Date.now() - hit.time < 300000 ? hit.data : await locationService.search(key);
-        if (alive) {
-          setPlaces(data);
-          setSearched(true);
-          if (cache.current.size > 30) cache.current.clear();
-          cache.current.set(key, { time: Date.now(), data });
+    const id = setTimeout(
+      async () => {
+        if (query.trim().length < 3) {
+          setPlaces([]);
+          setSearched(false);
+          setSearching(false);
+          return;
         }
-      } catch (e) {
-        if (alive) setError(locationErrorKey(e));
-      } finally {
-        if (alive) setSearching(false);
-      }
-    }, 400);
+        const value = query.trim();
+        const key = `${searchMode}:${value}`;
+        setSearching(true);
+        setError("");
+        try {
+          const hit = cache.current.get(key);
+          const data =
+            hit && Date.now() - hit.time < 300000
+              ? hit.data
+              : await locationService[searchMode](value);
+          if (alive) {
+            setPlaces(data);
+            setSearched(true);
+            if (cache.current.size > 30) cache.current.clear();
+            cache.current.set(key, { time: Date.now(), data });
+          }
+        } catch (e) {
+          if (alive) {
+            setError(locationErrorKey(e));
+            setPlaces([]);
+            setSearched(false);
+          }
+        } finally {
+          if (alive) setSearching(false);
+        }
+      },
+      searchMode === "geocode" ? 0 : 400,
+    );
     return () => {
       alive = false;
       clearTimeout(id);
     };
-  }, [query, retry]);
+  }, [query, retry, searchMode]);
+  function geocode() {
+    if (query.trim().length < 3 || busy || searching) return;
+    setSearchMode("geocode");
+    setRetry((v) => v + 1);
+  }
   async function select(p: Position, reverse = true) {
     const rev = ++revision.current;
     setPoint({ ...p, source: p.source || "manual" });
@@ -73,12 +90,13 @@ export default function LocationPicker({
     setLocality(p.locality || "");
     setAddress(p.formatted_address || "");
     setError("");
+    setBusy(reverse);
     if (!reverse) return;
     setBusy(true);
     try {
       const place = await boundedLocation(locationService.reverse(p.latitude, p.longitude), 5000);
       if (rev === revision.current) {
-        setPoint({ ...place, ...p });
+        setPoint(mergeReverseLocation(p, place));
         setLocality(place.locality || "");
         setAddress(place.formatted_address || "");
       }
@@ -135,7 +153,25 @@ export default function LocationPicker({
               }}
             />
           )}
-          <Field label={t("manual")} value={query} onChange={setQuery} />
+          <Field
+            label={t("manual")}
+            value={query}
+            maxLength={500}
+            returnKeyType="search"
+            onSubmitEditing={geocode}
+            onChange={(value) => {
+              setQuery(value);
+              setSearchMode("search");
+              setPlaces([]);
+              setSearched(false);
+            }}
+          />
+          <Button
+            title={t("searchAddress")}
+            secondary
+            disabled={query.trim().length < 3 || busy || searching}
+            onPress={geocode}
+          />
           {(busy || searching) && (
             <>
               <ActivityIndicator color={colors.accent} />
@@ -167,14 +203,18 @@ export default function LocationPicker({
               secondary
               disabled={busy}
               onPress={() => {
+                const request = ++revision.current;
                 setBusy(true);
-                locationService
-                  .resolve(p.id)
+                resolveLocationSuggestion(p, locationService.resolve)
                   .then((place) =>
-                    select({ ...place, ...coordinates(place.latitude, place.longitude) }, false),
+                    request === revision.current ? select(place, false) : undefined,
                   )
-                  .catch((e) => setError(locationErrorKey(e)))
-                  .finally(() => setBusy(false));
+                  .catch((e) => {
+                    if (request === revision.current) setError(locationErrorKey(e));
+                  })
+                  .finally(() => {
+                    if (request === revision.current) setBusy(false);
+                  });
               }}
             />
           ))}

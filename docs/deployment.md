@@ -64,7 +64,7 @@ Functions configured without platform JWT verification perform their own authent
 
 ## 5. Maps
 
-Provision Ola Maps for address search and set OLA_MAPS_API_KEY as an Edge secret. Configure a licensed MapLibre-compatible style/tiles endpoint in the mobile public environment. The key in a style URL is public: apply provider restrictions. Test autocomplete, details, reverse geocoding, manual locality selection, GPS denial, and tiles on a physical device. The server adapter interface allows replacing Ola without rewriting screens.
+MapLibre uses keyless OpenFreeMap for the basemap. Address lookup is separate: configure an activated Ola server key as `OLA_MAPS_API_KEY` and `LOCATION_PROVIDER=ola` in Supabase Edge secrets only. Never place it in mobile public configuration. See [address-search configuration and verified status](address-search.md) for the official API contract, secure live diagnostic, exact credential blocker and phone acceptance procedure. Test autocomplete, details, forward/reverse geocoding, manual selection, GPS denial and tiles independently.
 
 ## 6. Firebase and push delivery
 
