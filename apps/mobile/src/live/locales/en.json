@@ -412,5 +412,9 @@
   "otaUnavailable": "OTA checks require the installed app; they are unavailable in web or development mode.",
   "otaCheck": "Check for Updates",
   "otaRestart": "Restart to Apply",
-  "otaEmergency": "The app recovered using an earlier update. Retry checking, and report the update ID if this continues."
+  "otaEmergency": "The app recovered using an earlier update. Retry checking, and report the update ID if this continues.",
+  "locationSearchOff": "Address search is temporarily off. Use your current location or move the map pin, then enter your locality.",
+  "locationSearchChecking": "Checking optional address search. GPS and manual selection are ready.",
+  "retryAddressSearch": "Check address search",
+  "locationCoordinatesApply": "Apply the edited coordinates before confirming this location."
 }

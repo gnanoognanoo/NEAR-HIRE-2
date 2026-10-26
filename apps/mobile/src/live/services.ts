@@ -129,6 +129,7 @@ export type Place = {
   formatted_address?: string;
 };
 export const locationService = {
+  capabilities: () => edge<unknown>("location", { action: "capabilities" }),
   gps: deviceLocation,
   search: (query: string) => edge<Place[]>("location", { action: "search", query }),
   geocode: (query: string) => edge<Place[]>("location", { action: "geocode", query }),

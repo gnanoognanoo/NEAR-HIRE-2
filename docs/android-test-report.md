@@ -1,5 +1,7 @@
 # Physical Android smoke test — 23 October 2026
 
+> 26 October update: optional address lookup is now disabled server-side and GPS/manual confirmation is independent of it. Automated/hosted checks passed; the current APK retest is pending because ADB detects no phone. See [provider-independent location status](address-search.md). The physical results below remain the dated 23 October test, not a new device pass.
+
 ## Result
 
 PHYSICAL SMOKE TEST PASSED for the checks recorded below. Extended end-to-end tests remain pending; this is not a production-readiness claim.

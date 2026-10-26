@@ -66,6 +66,8 @@ Functions configured without platform JWT verification perform their own authent
 
 MapLibre uses keyless OpenFreeMap for the basemap. Address lookup is separate: configure an activated Ola server key as `OLA_MAPS_API_KEY` and `LOCATION_PROVIDER=ola` in Supabase Edge secrets only. Never place it in mobile public configuration. See [address-search configuration and verified status](address-search.md) for the official API contract, secure live diagnostic, exact credential blocker and phone acceptance procedure. Test autocomplete, details, forward/reverse geocoding, manual selection, GPS denial and tiles independently.
 
+Current startup mode is `LOCATION_PROVIDER=disabled`: the supported server mode makes no Ola requests, and the app uses GPS/manual map confirmation with a user-entered locality. Enable `ola` only after credential validation; address lookup is optional and does not gate PostGIS discovery or selecting a real point.
+
 ## 6. Firebase and push delivery
 
 Create a Firebase Android app with package `app.nearhire.mobile`. Download `google-services.json` and keep it outside source control. Set the `GOOGLE_SERVICES_JSON` file path for app.config.js/EAS. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY as Edge secrets. Give the service account only the messaging permissions it needs.

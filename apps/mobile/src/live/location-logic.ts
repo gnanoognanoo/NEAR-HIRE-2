@@ -66,6 +66,8 @@ export function locationErrorKey(e: unknown) {
         LOCATION_RATE_LIMIT: "locationRateLimit",
         LOCATION_NOT_FOUND: "noPlaces",
         LOCATION_NOT_CONFIGURED: "locationUnavailable",
+        LOCATION_PROVIDER_DISABLED: "locationSearchOff",
+        LOCATION_LOCALITY_REQUIRED: "postingLocalityError",
         LOCATION_PROVIDER_AUTH: "locationUnavailable",
         LOCATION_INVALID_RESPONSE: "locationUnavailable",
       } as Record<string, string>

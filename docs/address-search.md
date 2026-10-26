@@ -1,5 +1,21 @@
 # Address search: Ola server integration
 
+## GPS/manual mode — 26 October 2026
+
+**Startup/location selection no longer depends on Ola.** Hosted `LOCATION_PROVIDER=disabled` is now configured after deploying the supported disabled mode. The `location` function is ACTIVE at version 17. Ola's adapter remains available behind the existing interface; its rejected key was not uploaded or retried.
+
+The authenticated `capabilities` action returns `search=false`, `reverseGeocoding=false`, `reason=disabled`. The mobile picker checks this once when opened and hides unavailable address inputs while keeping GPS, the actual map pin and manual coordinate entry available. A capability failure also leaves manual/GPS selection available. Users can explicitly check address-search availability again later. A rejected provider credential or provider outage pauses optional lookup for that picker instead of retrying on each pin move.
+
+Disabled-provider search/details/geocode/reverse requests retain the existing JSON-error/503 contract (`LOCATION_PROVIDER_DISABLED`); they never call Ola, return mock places or create coordinates. Cached addresses are not served when lookup is disabled. Authentication, active-profile checks and the existing request budget apply to capability and legacy requests. Real hosted verification using an existing account passed: capabilities 200/disabled, search/geocode 503/disabled, invalid action 400, unauthenticated request 401. No accounts or jobs were created, and only the diagnostic's newly opened login session was signed out.
+
+Selecting a GPS/manual point immediately enables the review sheet. Reverse geocoding, if enabled later, enriches it in the background and does not block confirmation, including on timeout/failure. Confirmation requires an actual validated point and a manually entered locality when no address is available; the street address stays optional. Unapplied/invalid manual coordinate edits cannot silently confirm an older point. User-entered locality/address is not overwritten by a late lookup. The initial India-wide map viewport is not a selected location and cannot be confirmed.
+
+MapLibre/OpenFreeMap, native GPS permissions, draggable/tappable pins, PostGIS nearby discovery, private address storage, RLS, authentication and Razorpay are preserved. No native dependency/configuration changed and no APK was rebuilt. Current physical retest is pending because ADB detects no phone; earlier GPS/map tests remain recorded separately in [the Android report](android-test-report.md). Metro is ready on port 8081 for the existing development APK. Automated and hosted checks do not establish new physical-device success.
+
+Validation for this mode: mobile/admin TypeScript and ESLint PASS; 141 mobile tests plus 8 localization/workflow tests PASS; 63 local PostGIS/database scenarios PASS; 19 Edge tests PASS (including disabled-mode zero-provider-call coverage); web export, Android/Hermes export and credential scans PASS. Metro Android compilation and an actual HMR watcher update passed on the host. The temporary watcher edit was restored. No current phone-side result is claimed.
+
+To restore address lookup later, first validate an activated server key using the diagnostic below, configure it outside mobile/public environments, then set `LOCATION_PROVIDER=ola`. Reopen the picker or tap **Check address search**. No new binary is required for the provider setting. Another geocoder can implement `LocationSearchProvider` and be selected in `config.ts` without changing GPS/maps/PostGIS. Unknown or test-only selectors fail closed; the hosted API never selects fixtures.
+
 ## Supplied credential retry — 26 October 2026
 
 The newly supplied credential was saved only to the external `C:\PROJECTS\NEARHIRE-SECRETS\ola-server.env` file. The real server adapter's first autocomplete request for `Anna Nagar Chennai` returned HTTP **401**, classified as `LOCATION_PROVIDER_AUTH`. Validation stopped immediately; no details/geocode/reverse requests were made with the rejected credential.
@@ -81,4 +97,4 @@ The phone disconnected before an additional post-search GPS/manual retest could 
 
 Task 4 automated results: mobile/admin TypeScript and ESLint PASS; 135 mobile tests plus 8 localization/workflow tests PASS; 63 database/PostGIS scenarios PASS; 16 Edge regression tests PASS; strict Edge entry-point and diagnostic-script type checks PASS; Android/Hermes export and private-credential scans PASS. Provider tests use fixtures, and database tests use local PostGIS with mocked Auth identity/cron registration. No successful real-provider result is claimed.
 
-Run `npm run check`, `npm run lint`, `npm test`, `npm run test:db`, Android export/secret scan, and `npx deno test --config supabase/functions/deno.json supabase/functions/location/provider_test.ts supabase/functions/location/request_test.ts` after changes. No new binary, production OTA, Play publication, payment change or database migration is part of this integration.
+Run `npm run check`, `npm run lint`, `npm test`, `npm run test:db`, Android export/secret scan, and `npx deno test --config supabase/functions/deno.json supabase/functions/location/provider_test.ts supabase/functions/location/request_test.ts supabase/functions/location/config_test.ts` after changes. No new binary, production OTA, Play publication, payment change or database migration is part of this integration.

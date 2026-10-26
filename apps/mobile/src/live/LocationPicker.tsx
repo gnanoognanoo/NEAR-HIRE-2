@@ -7,7 +7,17 @@ import { boundedLocation, coordinates, locationErrorKey, type Position } from ".
 import { locationStatus } from "./location-acquisition";
 import CurrentLocationControl from "./CurrentLocationControl";
 import LocationPin from "./LocationPin";
-import { mergeReverseLocation, resolveLocationSuggestion } from "./location-selection";
+import {
+  confirmedLocation,
+  manualCoordinatesApplied,
+  optionalReverseLocation,
+  resolveLocationSuggestion,
+} from "./location-selection";
+import {
+  addressProviderUnavailable,
+  locationCapabilities,
+  NO_ADDRESS_PROVIDER,
+} from "./location-provider-state";
 export default function LocationPicker({
   t,
   onSelect,
@@ -27,14 +37,50 @@ export default function LocationPicker({
   const [locality, setLocality] = useState(initial?.locality || "");
   const [address, setAddress] = useState(initial?.formatted_address || "");
   const [busy, setBusy] = useState(false);
+  const [reversePending, setReversePending] = useState(false);
+  const [capabilities, setCapabilities] = useState(NO_ADDRESS_PROVIDER);
+  const [capabilitiesAttempt, setCapabilitiesAttempt] = useState(0);
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
   const [retry, setRetry] = useState(0);
   const [searchMode, setSearchMode] = useState<"search" | "geocode">("search");
   const revision = useRef(0);
+  const detailsEdited = useRef(false);
   const cache = useRef(new Map<string, { time: number; data: Place[] }>());
+  useEffect(
+    () => () => {
+      ++revision.current;
+    },
+    [],
+  );
   useEffect(() => {
+    let alive = true;
+    setCapabilitiesLoading(true);
+    setCapabilities(NO_ADDRESS_PROVIDER);
+    boundedLocation(locationService.capabilities(), 5000)
+      .then((data) => {
+        if (alive) setCapabilities(locationCapabilities(data));
+      })
+      .catch(() => {
+        if (alive) setCapabilities(NO_ADDRESS_PROVIDER);
+      })
+      .finally(() => {
+        if (alive) setCapabilitiesLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [capabilitiesAttempt]);
+  useEffect(() => {
+    if (!capabilities.search) {
+      cache.current.clear();
+      setPlaces([]);
+      setSearched(false);
+      setSearching(false);
+      return;
+    }
     let alive = true;
     const id = setTimeout(
       async () => {
@@ -62,7 +108,10 @@ export default function LocationPicker({
           }
         } catch (e) {
           if (alive) {
-            setError(locationErrorKey(e));
+            if (addressProviderUnavailable(e)) {
+              setCapabilities(NO_ADDRESS_PROVIDER);
+              setError("");
+            } else setError(locationErrorKey(e));
             setPlaces([]);
             setSearched(false);
           }
@@ -76,35 +125,47 @@ export default function LocationPicker({
       alive = false;
       clearTimeout(id);
     };
-  }, [query, retry, searchMode]);
+  }, [query, retry, searchMode, capabilities.search]);
   function geocode() {
-    if (query.trim().length < 3 || busy || searching) return;
+    if (!capabilities.search || query.trim().length < 3 || busy || searching) return;
     setSearchMode("geocode");
     setRetry((v) => v + 1);
   }
-  async function select(p: Position, reverse = true) {
+  function select(p: Position, reverse = true) {
     const rev = ++revision.current;
-    setPoint({ ...p, source: p.source || "manual" });
-    setLat(String(p.latitude));
-    setLng(String(p.longitude));
+    const selected = {
+      ...p,
+      ...coordinates(p.latitude, p.longitude),
+      source: p.source || "manual",
+    };
+    detailsEdited.current = false;
+    setPoint(selected);
+    setLat(String(selected.latitude));
+    setLng(String(selected.longitude));
     setLocality(p.locality || "");
     setAddress(p.formatted_address || "");
     setError("");
-    setBusy(reverse);
-    if (!reverse) return;
-    setBusy(true);
-    try {
-      const place = await boundedLocation(locationService.reverse(p.latitude, p.longitude), 5000);
-      if (rev === revision.current) {
-        setPoint(mergeReverseLocation(p, place));
-        setLocality(place.locality || "");
-        setAddress(place.formatted_address || "");
-      }
-    } catch (e) {
-      if (rev === revision.current) setError(locationErrorKey(e));
-    } finally {
-      if (rev === revision.current) setBusy(false);
-    }
+    setBusy(false);
+    setReversePending(reverse && capabilities.reverseGeocoding);
+    // Coordinates become usable immediately. Address enrichment never gates confirmation.
+    void optionalReverseLocation(
+      selected,
+      reverse && capabilities.reverseGeocoding,
+      locationService.reverse,
+    )
+      .then((result) => {
+        if (rev !== revision.current) return;
+        setPoint(result.point);
+        if (result.error) {
+          if (addressProviderUnavailable(result.error)) setCapabilities(NO_ADDRESS_PROVIDER);
+        } else if (!detailsEdited.current) {
+          setLocality(result.point.locality || "");
+          setAddress(result.point.formatted_address || "");
+        }
+      })
+      .finally(() => {
+        if (rev === revision.current) setReversePending(false);
+      });
   }
   async function gps() {
     setBusy(true);
@@ -140,6 +201,14 @@ export default function LocationPicker({
         }}
       >
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
+          <CurrentLocationControl
+            t={t}
+            onLocated={(p) => void select(p)}
+            onManual={() => {
+              setSheet(true);
+              setDiagnostics(true);
+            }}
+          />
           {(error === "locationPermanent" || error === "gpsDisabled") && Platform.OS !== "web" && (
             <Button
               title={t("openSettings")}
@@ -153,26 +222,42 @@ export default function LocationPicker({
               }}
             />
           )}
-          <Field
-            label={t("manual")}
-            value={query}
-            maxLength={500}
-            returnKeyType="search"
-            onSubmitEditing={geocode}
-            onChange={(value) => {
-              setQuery(value);
-              setSearchMode("search");
-              setPlaces([]);
-              setSearched(false);
-            }}
-          />
-          <Button
-            title={t("searchAddress")}
-            secondary
-            disabled={query.trim().length < 3 || busy || searching}
-            onPress={geocode}
-          />
-          {(busy || searching) && (
+          {capabilities.search ? (
+            <>
+              <Field
+                label={t("manual")}
+                value={query}
+                maxLength={500}
+                returnKeyType="search"
+                onSubmitEditing={geocode}
+                onChange={(value) => {
+                  setQuery(value);
+                  setSearchMode("search");
+                  setPlaces([]);
+                  setSearched(false);
+                }}
+              />
+              <Button
+                title={t("searchAddress")}
+                secondary
+                disabled={query.trim().length < 3 || busy || searching}
+                onPress={geocode}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={s.body}>
+                {t(capabilitiesLoading ? "locationSearchChecking" : "locationSearchOff")}
+              </Text>
+              <Button
+                title={t("retryAddressSearch")}
+                secondary
+                disabled={capabilitiesLoading}
+                onPress={() => setCapabilitiesAttempt((v) => v + 1)}
+              />
+            </>
+          )}
+          {(busy || searching || reversePending) && (
             <>
               <ActivityIndicator color={colors.accent} />
               <Text style={s.body}>{t("locationLoading")}</Text>
@@ -210,7 +295,10 @@ export default function LocationPicker({
                     request === revision.current ? select(place, false) : undefined,
                   )
                   .catch((e) => {
-                    if (request === revision.current) setError(locationErrorKey(e));
+                    if (request === revision.current) {
+                      if (addressProviderUnavailable(e)) setCapabilities(NO_ADDRESS_PROVIDER);
+                      else setError(locationErrorKey(e));
+                    }
                   })
                   .finally(() => {
                     if (request === revision.current) setBusy(false);
@@ -218,14 +306,6 @@ export default function LocationPicker({
               }}
             />
           ))}
-          <CurrentLocationControl
-            t={t}
-            onLocated={(p) => void select(p)}
-            onManual={() => {
-              setSheet(true);
-              setDiagnostics(true);
-            }}
-          />
         </ScrollView>
       </View>
       <View
@@ -290,20 +370,55 @@ export default function LocationPicker({
                   />
                 </>
               )}
-              <Field label={t("locality")} value={locality} onChange={setLocality} />
-              <Field label={t("privateAddress")} value={address} onChange={setAddress} />
+              <Field
+                label={t("locality")}
+                value={locality}
+                maxLength={120}
+                onChange={(value) => {
+                  detailsEdited.current = true;
+                  setLocality(value);
+                }}
+              />
+              <Field
+                label={t("privateAddress")}
+                value={address}
+                maxLength={500}
+                onChange={(value) => {
+                  detailsEdited.current = true;
+                  setAddress(value);
+                }}
+              />
               <Text style={s.body}>{t("privateLocationNote")}</Text>
+              {point && !manualCoordinatesApplied(point, lat, lng) && (
+                <Text accessibilityRole="alert" style={s.body}>
+                  {t("locationCoordinatesApply")}
+                </Text>
+              )}
+              {!!error && (
+                <Text accessibilityRole="alert" style={s.body}>
+                  {t(error)}
+                </Text>
+              )}
               <Button
                 title={t("confirmLocation")}
-                disabled={!point || busy || locality.trim().length < 2}
+                disabled={
+                  !point ||
+                  busy ||
+                  locality.trim().length < 2 ||
+                  !manualCoordinatesApplied(point, lat, lng)
+                }
                 onPress={() => {
-                  if (point)
-                    onSelect({
-                      ...point,
-                      locality: locality.trim(),
-                      formatted_address: address.trim(),
-                      label: locality.trim(),
+                  try {
+                    const selected = confirmedLocation(point, locality, address, {
+                      latitude: lat,
+                      longitude: lng,
                     });
+                    ++revision.current;
+                    setReversePending(false);
+                    onSelect(selected);
+                  } catch (e) {
+                    setError(locationErrorKey(e));
+                  }
                 }}
               />
             </ScrollView>
