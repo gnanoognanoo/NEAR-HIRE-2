@@ -1,5 +1,11 @@
 # Address search: Ola server integration
 
+## Supplied credential retry — 26 October 2026
+
+The newly supplied credential was saved only to the external `C:\PROJECTS\NEARHIRE-SECRETS\ola-server.env` file. The real server adapter's first autocomplete request for `Anna Nagar Chennai` returned HTTP **401**, classified as `LOCATION_PROVIDER_AUTH`. Validation stopped immediately; no details/geocode/reverse requests were made with the rejected credential.
+
+Hosted configuration was checked again: `LOCATION_PROVIDER=ola` is already correct, and `OLA_MAPS_API_KEY` remains absent. The rejected key was not uploaded. No function redeployment, APK rebuild or mobile public-environment change was made. No Android device or Metro server was available for this retry. The remaining blocker is a server API key accepted by Ola, including any activation/account/restriction correction required by Ola; the 401 alone does not identify which of those applies.
+
 ## Verified state — 23 October 2026
 
 PARTIAL: repository integration and unavailable-provider fallback tested; live address search is blocked on an activated Ola server API key.
