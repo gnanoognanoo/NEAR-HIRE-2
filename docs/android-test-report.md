@@ -1,3 +1,11 @@
+# Isolated staging authentication attempt — 27 October 2026
+
+The existing vivo V2204 development APK connected to staging Metro on 8082 and displayed the real phone login. Controlled requests reached the Supabase Send SMS Hook, but successful SMS delivery and OTP verification were **not** demonstrated. The owner reported a voice call. Delivery is now paused; no code was read or recorded, and no confirmed staging phone session is claimed. The corrected manual-code POST adapter has automated coverage and is deployed, but has not sent another real request. Android SMS autofill, new/returning phone login, logout/restoration and a physical two-party marketplace flow remain pending.
+
+Staging is now available, all 13 migrations including the repost fix are deployed there, and **20 hosted authenticated marketplace checks passed** with synthetic email actors. These supersede the earlier staging-unavailable blocker below, not the physical-phone test limitations. Production was unchanged. See [staging results and remaining SMS blocker](staging.md). No new APK was required or built.
+
+---
+
 # Marketplace UI smoke — 27 October 2026
 
 The existing development APK loaded the marketplace changes through Metro/Fast Refresh on vivo V2204. My Posts and Applicants rendered, as did the separate residential/business form fields; no job, application, review, profile or payment was submitted. App-process inspection found zero matching JS/native runtime error lines. The full two-party phone workflow and new accepted-participant map remain BLOCKED pending isolated staging/accounts. See [Task 4 marketplace verification](marketplace-verification.md) for the local 81-scenario results, hosted read-only checks, confirmed repost defect and undeployed fix. No new APK was built.

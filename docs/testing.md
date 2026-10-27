@@ -1,5 +1,7 @@
 # Test and validation guide
 
+For actual isolated hosted Auth/PostgREST marketplace testing, use the guarded `scripts/test-staging-marketplace.cjs` and external credentials described in [staging.md](staging.md). It refuses production and requires explicit `--run`; it is not run automatically by unit-test CI. SMS provider acceptance/handset delivery remain separate tests.
+
 ```powershell
 cd "C:\PROJECTS\NEAR HIRE"
 npm run lint

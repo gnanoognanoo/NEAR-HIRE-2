@@ -585,6 +585,10 @@ export default function LiveApp() {
               ) : undefined
             }
           />
+          {__DEV__ &&
+            process.env.EXPO_PUBLIC_SUPABASE_URL === "https://jovdckzwiprxjxtmogqk.supabase.co" && (
+              <Text style={[s.body, { textAlign: "center" }]}>{t("stagingOnly")}</Text>
+            )}
           <UpdateNotice t={t} />
           <ScrollView
             ref={pageScroll}

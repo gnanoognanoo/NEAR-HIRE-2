@@ -1,5 +1,7 @@
 # Task 4 marketplace verification — 27 October 2026
 
+> Follow-up: [isolated staging](staging.md) has now been created, all 13 migrations deployed and 20 real authenticated hosted marketplace checks passed. The earlier blocker/results below are retained as the pre-staging record. Real phone OTP and full physical two-party testing remain pending; production was not deployed.
+
 **PARTIAL: automated lifecycle verification passed; hosted two-party and physical end-to-end verification is BLOCKED by the absence of an isolated staging environment and its authenticated employer/worker accounts.** No production marketplace records were created or changed. No production deployment, OTA publication, payment, APK build or authentication bypass was performed.
 
 ## Environments and evidence

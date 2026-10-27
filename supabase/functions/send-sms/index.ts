@@ -18,11 +18,18 @@ const client = () =>
     },
   );
 Deno.serve(createSmsHandler({
+  report: (code, status) =>
+    console.warn("SMS delivery failed", { code, status }),
   config: () => ({
     hookSecret: required("SEND_SMS_HOOK_SECRET"),
     apiKey: required("TWOFACTOR_API_KEY"),
     template: required("TWOFACTOR_TEMPLATE_NAME"),
+    apiMode: Deno.env.get("TWOFACTOR_API_MODE") || "template-json",
     recipientSalt: required("SMS_RECIPIENT_HASH_SECRET"),
+    deliveryEnabled: Deno.env.get("SMS_DELIVERY_ENABLED") !== "false",
+    requireAllowlist: Deno.env.get("NEARHIRE_ENVIRONMENT") === "staging",
+    allowedRecipients: (Deno.env.get("SMS_ALLOWED_RECIPIENTS") || "")
+      .split(",").map((p) => p.trim()).filter(Boolean),
   }),
   reserve: async (event, recipient) => {
     const { data, error } = await client().rpc("reserve_sms_delivery", {

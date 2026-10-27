@@ -101,6 +101,7 @@ test("maps provider, invalid/expired, rate-limit and network errors without expo
     [{ status: 429 }, "authRateLimit"],
     [{ code: "over_sms_send_rate_limit" }, "authRateLimit"],
     [{ code: "phone_provider_disabled" }, "authProviderUnavailable"],
+    [{ status: 503, name: "AuthRetryableFetchError" }, "authProviderUnavailable"],
     [{ name: "AuthRetryableFetchError" }, "authNetwork"],
     [{ name: "TimeoutError" }, "authNetwork"],
     [{ message: "untrusted provider details" }, "genericError"],

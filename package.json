@@ -3,8 +3,9 @@
   "private": true,
   "scripts": {
     "check": "npm --prefix apps/mobile run check && npm --prefix apps/admin run check",
-    "test": "node scripts/test-mobile.cjs && node --test tests/localization.mjs tests/update-workflow.cjs",
+    "test": "node scripts/test-mobile.cjs && node --test tests/localization.mjs tests/update-workflow.cjs tests/staging-workflow.cjs",
     "start:dev": "node scripts/start-development.cjs",
+    "start:staging": "node scripts/start-staging.cjs",
     "update:preview": "node scripts/publish-update.cjs --channel preview",
     "update:production": "node scripts/publish-update.cjs --channel production",
     "export:android": "node scripts/export-android.cjs",

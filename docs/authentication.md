@@ -1,5 +1,7 @@
 # NearHire authentication
 
+> Current staging deployment and actual SMS/marketplace results: [staging.md](staging.md), 27 October 2026. The project is isolated and all migrations are deployed. Phone Auth/hook are configured there, but delivery is paused after the owner received a call rather than verified SMS. The detailed manual-code API uses POST; the advertised JSON route returned 404. The dated setup snapshot below is historical and must not be used to redeploy/configure production.
+
 Reviewed 15 September 2026. Supabase Auth owns consumer identity and sessions. Firebase is FCM only. Admin authentication/MFA and payment ownership remain unchanged.
 
 ## Implementation and verified limits
@@ -34,7 +36,7 @@ Phone-first users sign in with their existing method, then use Profile → Login
 
 PKCE verifier persistence is managed by supabase-js. The pending callback stores only target, expected UUID and timestamp, expires after ten minutes, and is removed after completion or logout. Only the expected callback origin/path is accepted. Web callback query strings are removed before session exchange. No OTP/provider token is displayed or logged.
 
-## 2Factor delivery setup (not enabled)
+## Historical 2Factor setup reference (superseded for staging)
 
 Supabase generates and verifies every six-digit OTP and issues the session. The hook uses the signed sms.phone destination from current Supabase Auth, including phone_change. Legacy login payloads may fall back to user.phone only when no pending phone_change exists; ambiguous change payloads fail closed. 2Factor only delivers the supplied code through the Send SMS Hook; no AUTOGEN or provider verification endpoint is used.
 

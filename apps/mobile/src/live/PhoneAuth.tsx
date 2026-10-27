@@ -82,6 +82,7 @@ export default function PhoneAuth({
             onChangeText={(v) => setOtp(v.replace(/\D/g, "").slice(0, 6))}
             keyboardType="number-pad"
             autoComplete="sms-otp"
+            importantForAutofill="yes"
             textContentType="oneTimeCode"
             maxLength={6}
           />

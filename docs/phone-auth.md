@@ -1,4 +1,4 @@
-> Current provider decision, hosted readiness and existing-APK instructions: [authentication.md](authentication.md). Results below are historical; do not reinitialize EAS or build another APK from this older checklist.
+> Current isolated staging, 2Factor deployment, delivery blocker and existing-APK instructions: [staging.md](staging.md). Results below are historical; do not reinitialize EAS or build another APK from this older checklist. Staging Phone Auth is enabled; real SMS delivery and phone verification have not passed.
 
 # Task 2: phone OTP — BLOCKED on SMS provider setup
 

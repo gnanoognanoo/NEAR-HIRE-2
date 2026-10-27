@@ -47,6 +47,8 @@ export function authErrorKey(error: unknown): string {
   // Supabase intentionally uses otp_expired for both invalid and expired SMS codes.
   if (code === "otp_expired") return "otpExpired";
   if (e?.status === 429 || /over_.*rate_limit|RATE_LIMITED/.test(code)) return "authRateLimit";
+  // Supabase wraps hook HTTP 503 as AuthRetryableFetchError, even with connectivity.
+  if (e?.status === 503) return "authProviderUnavailable";
   if (
     [
       "phone_provider_disabled",
