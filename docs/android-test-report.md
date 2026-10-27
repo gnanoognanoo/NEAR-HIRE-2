@@ -1,6 +1,27 @@
+# Provider-independent location phone test — 27 October 2026
+
+**PASS for GPS and manual-pin location confirmation with Ola disabled.** The existing vivo V2204 (Android 12) was authorized through ADB and connected to Metro on port 8081 using USB reverse. A real React Native inspector target confirmed the development-client connection. APK build `ac22ccd3-3c58-4f70-a26b-bff9515f3f02` was reused without reinstalling or rebuilding; Metro served source `6ca3db9`.
+
+Observed on the physical phone:
+
+- Native MapLibre rendered OpenFreeMap tiles and attribution. The picker displayed the new address-search-disabled message and **Check address search** control.
+- Before selecting any point, **Confirm location** was disabled; the India-wide viewport was not treated as a selected location.
+- **Use current location** obtained a real GPS fix with approximately 10 m reported accuracy. Confirmation became available without reverse geocoding.
+- The confirmation sheet required a locality. With a temporary test label and the private address left empty, confirmation returned to Nearby Workers and displayed the selected label.
+- Dragging the native map pin changed the status to **Selected location**. Manual-point confirmation also returned to Nearby Workers without search/reverse lookup.
+- Neither test created a job, saved a profile/address, nor changed wallet/payment data. Locality labels were explicitly temporary test labels, not asserted real addresses. All selected coordinates came from GPS or an actual map gesture; no coordinates were fabricated or recorded in this report.
+- Cold force-stop/relaunch cleared both in-memory test labels and restored the existing authenticated Post Work home with 12 displayed credits. No authentication bypass or new account was used.
+- App-process log inspection found zero matching JavaScript/native runtime error lines during these checks. This is a bounded smoke test, not proof of all possible runtime behavior.
+
+Automated mobile/localization/update-workflow tests were rerun: **149 passed, zero failures**. The previous implementation validation (231 tests in total, TypeScript, ESLint, Edge checks, exports and credential scans) remains recorded in [address-search.md](address-search.md); application source did not change during this phone retest.
+
+Still not tested on the phone in this retest: manual coordinate text editing, permission denial/recovery, Tamil rendering of the new message, live address suggestions/geocoding, complete job publication, notifications and Razorpay checkout. Address search remains intentionally disabled pending an accepted server provider credential. PostGIS/RLS/privacy and existing native integrations were unchanged. No APK build, OTA publication or production-channel update was submitted.
+
+---
+
 # Physical Android smoke test — 23 October 2026
 
-> 26 October update: optional address lookup is now disabled server-side and GPS/manual confirmation is independent of it. Automated/hosted checks passed; the current APK retest is pending because ADB detects no phone. See [provider-independent location status](address-search.md). The physical results below remain the dated 23 October test, not a new device pass.
+> Historical 26 October status: the phone was unavailable then. The 27 October retest above now verifies GPS/manual confirmation with optional address lookup disabled. The results below remain the separate 23 October test.
 
 ## Result
 
