@@ -21,6 +21,8 @@ import DistanceControl from "./DistanceControl";
 import { validateRadiusMetres } from "./radius-logic";
 import { JobCreditBalance, PublishConfirmation, CreditBalanceChip } from "./JobCreditBalance";
 import LocationPicker from "./LocationPicker";
+import JobMap from "./JobMap";
+import { authorizedContactPosition, canFillJob, retryableRepost } from "./marketplace-activity";
 import { activeNearby, type Position } from "./location-logic";
 import PhoneAuth from "./PhoneAuth";
 import GoogleButton from "./GoogleButton";
@@ -92,6 +94,13 @@ const csv = (v: string) =>
     .split(",")
     .map((x) => x.trim())
     .slice(0, 30);
+const repostWithRecovery = retryableRepost({
+  read: AsyncStorage.getItem,
+  write: AsyncStorage.setItem,
+  remove: AsyncStorage.removeItem,
+  requestId: Crypto.randomUUID,
+  repost: jobService.repost,
+});
 const codeMap: Record<string, string> = {
   INVALID_PHONE: "phoneError",
   INVALID_OTP: "otpError",
@@ -451,6 +460,7 @@ export default function LiveApp() {
       )}
       {["applications", "posts", "applicants", "saved"].includes(screen) && (
         <Activity
+          userId={session.user.id}
           openCredits={() => setCreditOverlay(true)}
           key={screen}
           t={t}
@@ -1056,6 +1066,7 @@ function AsyncState({ query, t }: { query: any; t: Translate }) {
   ) : null;
 }
 function Activity({
+  userId,
   openCredits,
   t,
   run,
@@ -1063,6 +1074,7 @@ function Activity({
   saved,
   initialMode = "applications",
 }: {
+  userId: string;
   t: Translate;
   run: Run;
   busy: boolean;
@@ -1078,6 +1090,7 @@ function Activity({
   const [stars, setStars] = useState("5");
   const [body, setBody] = useState("");
   const [contact, setContact] = useState<any>(null);
+  const contactPosition = authorizedContactPosition(contact);
   const q = useInfiniteQuery({
     queryKey: ["activity", mode],
     queryFn: ({ pageParam }) => jobService.activity(mode, pageParam),
@@ -1177,12 +1190,10 @@ function Activity({
                     t={t}
                     busy={busy}
                     repost
-                    onConfirm={() =>
-                      run(() => jobService.repost(a.id, Crypto.randomUUID()), "jobPublished")
-                    }
+                    onConfirm={() => run(() => repostWithRecovery(userId, a.id), "jobPublished")}
                   />
                 )}{" "}
-                {a.status === "active" && Date.parse(a.expires_at) > Date.now() && (
+                {canFillJob(a.status) && (
                   <Button
                     title={t("filled")}
                     secondary
@@ -1295,6 +1306,18 @@ function Activity({
                 <Text selectable style={s.body}>
                   {contact.exact_address}
                 </Text>
+                {contactPosition && (
+                  <>
+                    <Text style={s.body}>{t("authorizedWorkLocation")}</Text>
+                    <JobMap
+                      position={contactPosition}
+                      jobs={[]}
+                      onSelect={() => {}}
+                      unavailable={t("mapFailed")}
+                      t={t}
+                    />
+                  </>
+                )}
               </>
             )}
             {review && (

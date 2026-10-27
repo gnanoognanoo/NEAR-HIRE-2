@@ -12,6 +12,8 @@ npx deno check --config supabase/functions/deno.json supabase/functions/location
 
 ## Database coverage
 
+The 27 October marketplace lifecycle expansion and exact hosted/phone limits are recorded in [Task 4 verification](marketplace-verification.md). The suite now runs 81 disposable database scenarios, including separate residential/business publication through reviews and timed reposting with purchases disabled. These local fixtures never connect to a hosted project. The pending repost compatibility migration must be validated in staging before any production release.
+
 The embedded PostgreSQL/PostGIS suite applies the migrations and tests ownership, RLS, private location protection, radius filtering, idempotent publication, duplicate/self applications, unauthorized acceptance, contact unlocking, completion, reviews, expiry, reposting, blocks, payment amount validation, repeated webhook settlement, and admin access.
 
 Supabase Auth/storage platform definitions and cron registration are test shims. PostGIS and business functions are real. Hosted Auth, SMS, PostgREST, storage API integration, scheduler delivery, network concurrency, and device push remain external integration tests.

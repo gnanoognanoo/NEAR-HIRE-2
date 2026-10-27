@@ -416,5 +416,6 @@
   "locationSearchOff": "Address search is temporarily off. Use your current location or move the map pin, then enter your locality.",
   "locationSearchChecking": "Checking optional address search. GPS and manual selection are ready.",
   "retryAddressSearch": "Check address search",
-  "locationCoordinatesApply": "Apply the edited coordinates before confirming this location."
+  "locationCoordinatesApply": "Apply the edited coordinates before confirming this location.",
+  "authorizedWorkLocation": "Private work location — shared with accepted participants only."
 }

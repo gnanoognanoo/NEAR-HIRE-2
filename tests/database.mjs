@@ -1,4 +1,5 @@
 import { testJobPosting } from "./job-posting.mjs";
+import { testMarketplaceLifecycle } from "./marketplace-lifecycle.mjs";
 import { testCreditsV2 } from "./credits-v2.mjs";
 import { testDualAuth } from "./dual-auth-db.mjs";
 import { PGlite } from "@electric-sql/pglite";
@@ -30,6 +31,7 @@ for (const file of [
   "202609140001_credit_entitlements_v2.sql",
   "202609150001_sms_hook_guard.sql",
   "20261008090813_job_posting_recovery.sql",
+  "20261027134512_marketplace_repost_compatibility.sql",
 ]) {
   if (file === "202609140001_credit_entitlements_v2.sql") {
     await pg.exec(
@@ -1069,6 +1071,7 @@ await check(
 await testJobPosting({ pg, check, asUser, rpc, input });
 await testCreditsV2({ pg, check, asUser, rpc, input });
 await testDualAuth({ pg, check, asUser, rpc });
+await testMarketplaceLifecycle({ pg, check, asUser, rpc, input });
 console.log(
   `${checks} database integration scenarios passed. Real PostGIS; mocked Auth identity and cron registration only.`,
 );

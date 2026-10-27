@@ -1,3 +1,9 @@
+# Marketplace UI smoke — 27 October 2026
+
+The existing development APK loaded the marketplace changes through Metro/Fast Refresh on vivo V2204. My Posts and Applicants rendered, as did the separate residential/business form fields; no job, application, review, profile or payment was submitted. App-process inspection found zero matching JS/native runtime error lines. The full two-party phone workflow and new accepted-participant map remain BLOCKED pending isolated staging/accounts. See [Task 4 marketplace verification](marketplace-verification.md) for the local 81-scenario results, hosted read-only checks, confirmed repost defect and undeployed fix. No new APK was built.
+
+---
+
 # Provider-independent location phone test — 27 October 2026
 
 **PASS for GPS and manual-pin location confirmation with Ola disabled.** The existing vivo V2204 (Android 12) was authorized through ADB and connected to Metro on port 8081 using USB reverse. A real React Native inspector target confirmed the development-client connection. APK build `ac22ccd3-3c58-4f70-a26b-bff9515f3f02` was reused without reinstalling or rebuilding; Metro served source `6ca3db9`.
